@@ -128,6 +128,28 @@ memorydex --db mysql --db-url 'mysql://user:pass@host:3306/db' stats
 
 For `pg`/`mysql`: install the driver (`pg` / `mysql2`) and provide `db.url` (e.g. `postgres://user:pass@host/db`). The SQL adapter interface is `MemoryStore` (`src/db/adapter.ts`) — any backend implementing it works.
 
+## Multi-platform memory (Claude / Codex / Codebuddy / WorkBuddy)
+
+memorydex can **scan and import** the on-disk memories of several AI coding tools into one store, tagged by `platform`:
+
+| Platform | Where its memory lives | Writable |
+|---|---|---|
+| Claude Code | `CLAUDE.md` (project + `~/.claude/`) | ✅ |
+| Codex | `AGENTS.md` | ✅ |
+| Codebuddy | `~/.codebuddy/projects/<proj>/memory/*.md` (frontmatter `name/description/type`) | ✅ |
+| WorkBuddy | root `SOUL.md`/`USER.md`/`IDENTITY.md`/`MEMORY.md` + `memory/<uid>_memory.md` (embedded JSON `memoryBlock`) | ✅ (root) / ⚠️ read-only for runtime-owned `*_memory.md` |
+| Generic | any `.md` | ✅ |
+
+```bash
+memorydex scan                                   # discover memory files per platform
+memorydex import-platform --platform codebuddy    # import all of a platform's files
+memorydex import-platform --platform workbuddy ./AGENTS.md  # or explicit files
+```
+
+In the UI: **Sync → Platforms** lists each detected platform with an Import button; the board has a **platform filter**. Records keep a stable `source` (`<file>#<slug>`), so file-based platforms remain two-way syncable.
+
+> Note: these proprietary tools' runtime stores change without notice. Import is a best-effort read; do not write back to `*_memory.md` or private sqlite/`.info` caches.
+
 ## Scope & limits (lightweight by design)
 
 memorydex targets **personal / single-machine / small-team** use: one workspace's agent memory, local AGENTS.md ↔ memory upkeep, on the order of a few hundred to a few thousand records. It is intentionally **not** a multi-tenant or high-concurrency service:

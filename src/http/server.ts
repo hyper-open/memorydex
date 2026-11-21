@@ -20,6 +20,8 @@ import type { MemoryFilter, MemoryKind, MemoryUpdateInput } from '../core/types.
 import { MEMORY_KINDS } from '../core/types.ts'
 import { importFiles } from '../import/markdown.ts'
 import { pullFile, pushFile, trackedFiles } from '../sync/files.ts'
+import { defaultAdapters, importPlatform } from '../adapters/index.ts'
+import { homedir } from 'node:os'
 
 /** Read a JSON body (bounded). */
 async function readJson<T>(req: IncomingMessage): Promise<T> {
@@ -122,6 +124,25 @@ async function handleApi(service: MemoryService, req: IncomingMessage, res: Serv
     }
     if (direction === 'push') { json(res, 200, await pushFile(service, body.file)); return }
     json(res, 200, await pullFile(service, body.file))
+    return
+  }
+  if (rest[0] === 'platforms' && method === 'GET') {
+    const reg = defaultAdapters(homedir())
+    const out: Record<string, { writable: boolean; files: string[] }> = {}
+    for (const a of reg.list()) {
+      let files: string[] = []
+      try { files = await a.discover() } catch { files = [] }
+      out[a.platform] = { writable: a.writable, files }
+    }
+    json(res, 200, out)
+    return
+  }
+  if (rest[0] === 'import-platform' && method === 'POST') {
+    const body = await readJson<{ platform?: string; files?: string[] }>(req)
+    const reg = defaultAdapters(homedir())
+    const adapter = body.platform === undefined ? undefined : reg.get(body.platform)
+    if (adapter === undefined) { json(res, 400, { error: 'unknown platform', have: reg.list().map(a => a.platform) }); return }
+    json(res, 200, await importPlatform(service, adapter, body.files))
     return
   }
   if (rest[0] === 'tracked' && method === 'GET') {

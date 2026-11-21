@@ -28,11 +28,15 @@ function filterQs() {
 async function loadBoard() {
   const { memories } = await api(`/memories?${filterQs().toString()}`)
   let list = memories || []
+  const platform = el('#platformFilter').value
   if (el('#pinnedOnly').checked) list = list.filter(m => m.pinned)
+  if (platform) list = list.filter(m => (m.metadata && m.metadata.platform) === platform)
   cached = list
   renderBoard(list)
-  const tags = new Set()
-  for (const m of memories || []) for (const t of m.tags) tags.add(t)
+  const tags = new Set(); const plats = new Set()
+  for (const m of memories || []) { for (const t of m.tags) tags.add(t); if (m.metadata && m.metadata.platform) plats.add(m.metadata.platform) }
+  const psel = el('#platformFilter'); const pcur = psel.value
+  psel.innerHTML = '<option value="">All platforms</option>' + [...plats].sort().map(p => `<option${p === pcur ? ' selected' : ''} value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('')
   const sel = el('#tagFilter'); const cur = sel.value
   sel.innerHTML = '<option value="">All tags</option>' + [...tags].sort().map(t => `<option${t === cur ? ' selected' : ''} value="${escapeAttr(t)}">${escapeHtml(t)}</option>`).join('')
 }
@@ -59,6 +63,7 @@ function cardHtml(m) {
     <div class="meta">
       <span class="impbar" title="importance ${imp.toFixed(2)}"><i style="width:${Math.round(imp * 100)}%"></i></span>
       ${m.accessCount ? `<span class="src">· ${m.accessCount}×</span>` : ''}
+      ${m.metadata && m.metadata.platform ? `<span class="tag" style="background:#26405a;color:#9fd0ff">${escapeHtml(m.metadata.platform)}</span>` : ''}
       ${m.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}
       ${(m.links || []).map(id => `<button class="link" data-act="goto" data-target="${escapeAttr(id)}" title="linked memory">↔ ${escapeHtml(String(id).slice(-6))}</button>`).join('')}
       ${m.source ? `<span class="src">· ${escapeHtml(m.source.split('#')[0].split('/').pop())}${m.source.includes('#') ? '#' + escapeHtml(m.source.split('#')[1]) : ''}</span>` : ''}
@@ -141,6 +146,7 @@ async function loadGraph() {
 
 // ---- Sync ----
 async function loadSync() {
+  loadPlatforms()
   const { files } = await api('/tracked')
   const list = el('#filelist')
   if (!files || files.length === 0) { list.innerHTML = '<span class="empty">No tracked files yet — import a file first.</span>'; return }
@@ -153,6 +159,21 @@ async function loadSync() {
 async function doSync(file, direction) {
   const r = await api('/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ file, direction }) })
   toast(`${direction} ${file.split('/').pop()}: +${r.added ?? 0} ~${r.updated ?? 0} -${r.removed ?? 0}`); await loadSync()
+}
+
+async function loadPlatforms() {
+  let data = {}
+  try { data = await api('/platforms') } catch { data = {} }
+  const list = el('#platformlist')
+  const rows = Object.entries(data).map(([p, info]) =>
+    `<div class="filerow"><span style="flex:1">${escapeHtml(p)} <span class="src">· ${info.files.length} file(s)${info.writable ? '' : ' · read-only'}</span></span>
+     <button class="ghost sm" data-plat="${escapeAttr(p)}" ${info.files.length === 0 ? 'disabled' : ''}>Import</button></div>`).join('')
+  list.innerHTML = rows || '<span class="empty">No platforms detected.</span>'
+  list.querySelectorAll('[data-plat]').forEach(b => b.addEventListener('click', async () => {
+    const r = await api('/import-platform', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ platform: b.dataset.plat }) })
+    const n = (r || []).reduce((a, x) => a + x.imported, 0)
+    toast(`Imported ${n} from ${b.dataset.plat}`); await loadSync()
+  }))
 }
 
 // ---- dialog ----
@@ -206,6 +227,7 @@ el('#pinnedOnly').addEventListener('change', loadBoard)
 let searchTimer
 el('#search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadBoard, 200) })
 el('#tagFilter').addEventListener('change', loadBoard)
+el('#platformFilter').addEventListener('change', loadBoard)
 el('#importBtn').addEventListener('click', async () => {
   const raw = el('#importPath').value.trim(); if (!raw) return
   const files = raw.split(/[\n,]/).map(s => s.trim()).filter(Boolean)

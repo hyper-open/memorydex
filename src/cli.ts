@@ -13,6 +13,8 @@
   memorydex export [file.json]      Export all memories to a JSON bundle
   memorydex restore <file.json> [--replace]  Restore a bundle (merge|replace)
   memorydex reembed                 Recompute embeddings (after switching models)
+  memorydex scan                    Discover CLAUDE.md/AGENTS.md from known platforms
+  memorydex import-platform --platform <claude|codex|md> [files...]
  * Common flags: --db <sqlite|pg|mysql> --db-path <path> --db-url <url> --config <file>
  */
 import { mkdir } from 'node:fs/promises'
@@ -29,6 +31,9 @@ import { startHttpServer } from './http/server.ts'
 import { pullFile, pushFile, reconcileFile } from './sync/files.ts'
 import { watchFiles } from './sync/watch.ts'
 import { exportBundle, importBundle, reembedAll, type MemoryBundle } from './backup.ts'
+import { defaultAdapters } from './adapters/index.ts'
+import { importPlatform } from './adapters/index.ts'
+import { homedir } from 'node:os'
 import { readFile, writeFile } from 'node:fs/promises'
 
 /** Parse argv into { cmd, positionals, flags }. */
@@ -86,6 +91,8 @@ Usage:
   memorydex export [file.json]      Export all memories to a JSON bundle
   memorydex restore <file.json> [--replace]  Restore a bundle (merge|replace)
   memorydex reembed                 Recompute embeddings (after switching models)
+  memorydex scan                    Discover CLAUDE.md/AGENTS.md from known platforms
+  memorydex import-platform --platform <claude|codex|md> [files...]
 
 Flags: --db <sqlite|pg|mysql>  --db-path <sqlite file>  --db-url <pg/mysql url>  --config <file>
        --embed-url <url>  --embed-model <name>  --embed-key <key>  --embed-off  --embed-hashing
@@ -149,6 +156,22 @@ if (cmd === 'mcp') {
         const files = [...new Set((await service.allRecords()).map(r => r.source?.split('#')[0]).filter((x): x is string => !!x))]
         for (const f of files) process.stdout.write(JSON.stringify(dir === 'push' ? await pushFile(service, f) : await reconcileFile(service, f).then(r => r.result)) + '\n')
       }
+    } else if (cmd === 'scan') {
+      const reg = defaultAdapters(homedir())
+      const out: Record<string, string[]> = {}
+      for (const a of reg.list()) {
+        try { out[a.platform] = await a.discover() } catch { out[a.platform] = [] }
+      }
+      process.stdout.write(JSON.stringify(out, null, 2) + '\n')
+    } else if (cmd === 'import-platform') {
+      const platform = typeof flags.platform === 'string' ? flags.platform : pos.shift()
+      if (platform === undefined) { process.stderr.write('import-platform needs --platform <claude|codex|md>\n'); process.exit(1) }
+      const reg = defaultAdapters(homedir())
+      const adapter = reg.get(platform)
+      if (adapter === undefined) { process.stderr.write(`unknown platform: ${platform} (have: ${reg.list().map(a => a.platform).join(', ')})\n`); process.exit(1) }
+      const files = pos.length > 0 ? pos : undefined
+      const res = await importPlatform(service, adapter, files)
+      process.stdout.write(JSON.stringify(res.map(r => ({ platform: r.platform, location: r.location, imported: r.imported, updated: r.updated, unchanged: r.unchanged })), null, 2) + '\n')
     } else if (cmd === 'stats') {
       process.stdout.write(JSON.stringify(await service.stats(), null, 2) + '\n')
     } else if (cmd === 'export') {
