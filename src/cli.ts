@@ -71,7 +71,8 @@ async function openService(flags: Record<string, string | boolean>): Promise<{ s
   const resolved = await resolveEmbedder(emb)
   if (resolved.note !== undefined) process.stderr.write(`memorydex: ${resolved.note}\n`)
   const store = await openStore(db)
-  const service = new MemoryService(store, resolved.embedder ?? null)
+  const dedupe = flags['no-dedupe'] === true ? false : config.dedupe
+  const service = new MemoryService(store, resolved.embedder ?? null, { dedupe })
   return { service, close: () => store.close() }
 }
 
@@ -96,6 +97,7 @@ Usage:
 
 Flags: --db <sqlite|pg|mysql>  --db-path <sqlite file>  --db-url <pg/mysql url>  --config <file>
        --embed-url <url>  --embed-model <name>  --embed-key <key>  --embed-off  --embed-hashing
+       --no-dedupe
 Kinds: ${MEMORY_KINDS.join(', ')}
 `)
 }

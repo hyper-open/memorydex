@@ -6,7 +6,7 @@
  * tag matches, importance, and recency — enough for a useful default, and easy
  * to swap for vector search later.
  */
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import type { MemoryStore } from '../db/adapter.ts'
 import { cosine, HashingEmbedder, type Embedder } from './embedder.ts'
 import {
@@ -43,6 +43,12 @@ function clampImportance(v: number | undefined): number {
   return Math.max(0, Math.min(1, v))
 }
 
+/** Normalised content fingerprint for dedupe (order-insensitive on whitespace). */
+export function fingerprint(title: string, content: string): string {
+  const norm = (t: string): string => t.toLowerCase().replace(/\s+/g, ' ').trim()
+  return createHash('sha256').update(norm(title) + '\u0000' + norm(content)).digest('hex').slice(0, 24)
+}
+
 /** Tokenise text into lowercase word terms. */
 function terms(text: string): string[] {
   return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []
@@ -59,6 +65,8 @@ export class MemoryService {
    * @param store - the backing store adapter.
    */
   private readonly embedder: Embedder | undefined
+  /** Whether create() dedupes by default (source key / content fingerprint). */
+  readonly dedupeByDefault: boolean
 
   /**
    * @param store - the backing store adapter.
@@ -66,8 +74,9 @@ export class MemoryService {
    *   zero-dependency {@link HashingEmbedder} so vector recall works out of the box.
    *   Pass `null` to disable embeddings (pure lexical).
    */
-  constructor(private readonly store: MemoryStore, embedder: Embedder | null = new HashingEmbedder()) {
+  constructor(private readonly store: MemoryStore, embedder: Embedder | null = new HashingEmbedder(), options: { dedupe?: boolean } = {}) {
     this.embedder = embedder ?? undefined
+    this.dedupeByDefault = options.dedupe !== false
   }
 
   /** Compute an embedding for a record's text, or undefined when disabled. */
@@ -82,7 +91,43 @@ export class MemoryService {
   }
 
   /** Create and persist a new memory record. */
-  async create(input: MemoryCreateInput, now = Date.now()): Promise<MemoryRecord> {
+  /**
+   * Find an existing record equivalent to the input: same non-empty `source`,
+   * else same content fingerprint within the same kind.
+   */
+  async findDuplicate(input: MemoryCreateInput): Promise<MemoryRecord | undefined> {
+    const all = await this.store.all()
+    if (input.source !== undefined && input.source !== '') {
+      const bySource = all.find(r => r.source === input.source)
+      if (bySource !== undefined) return bySource
+    }
+    const fp = fingerprint(input.title, input.content)
+    return all.find(r => r.kind === input.kind && fingerprint(r.title, r.content) === fp)
+  }
+
+  /**
+   * Create a memory, optionally merging into an equivalent existing one.
+   * @param input - the record to create.
+   * @param now - timestamp override.
+   * @param opts - `dedupe` (default true): when a record with the same source-key
+   *   or content fingerprint exists, merge into it instead of duplicating.
+   */
+  async create(input: MemoryCreateInput, now = Date.now(), opts: { dedupe?: boolean } = {}): Promise<MemoryRecord> {
+    const dedupe = opts.dedupe ?? this.dedupeByDefault
+    if (dedupe) {
+      const existing = await this.findDuplicate(input)
+      if (existing !== undefined) {
+        const merged = await this.update(existing.id, {
+          kind: input.kind,
+          title: input.title,
+          content: input.content,
+          ...(input.tags === undefined ? {} : { tags: input.tags }),
+          ...(input.importance === undefined ? {} : { importance: input.importance }),
+          ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+        }, now)
+        return merged ?? existing
+      }
+    }
     if (!MEMORY_KINDS.includes(input.kind)) throw new Error(`Invalid memory kind: ${input.kind}`)
     if (input.title.trim() === '') throw new Error('Memory title must not be empty.')
     const emb = this.embedder === undefined ? undefined : await this.embedText(input.title, input.content, input.tags ?? [])

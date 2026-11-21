@@ -20,6 +20,8 @@ export interface MemorydexConfig {
   readonly host: string
   /** Embedding/vector-retrieval config. */
   readonly embedding: EmbeddingConfig
+  /** Whether new writes dedupe by default (source key / content fingerprint). */
+  readonly dedupe: boolean
 }
 
 /** Default config (SQLite in the user's home). */
@@ -29,6 +31,7 @@ export function defaultConfig(): MemorydexConfig {
     port: 7567,
     host: '127.0.0.1',
     embedding: { enabled: true, kind: 'hashing', hashingDim: 256 },
+    dedupe: true,
   }
 }
 
@@ -64,5 +67,6 @@ export function loadConfig(explicitPath?: string): MemorydexConfig {
     port: file.port ?? (process.env.MEMORYDEX_PORT === undefined ? base.port : Number(process.env.MEMORYDEX_PORT)),
     host: file.host ?? base.host,
     embedding,
+    dedupe: file.dedupe ?? (process.env.MEMORYDEX_DEDUPE === '0' ? false : base.dedupe),
   }
 }

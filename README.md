@@ -154,6 +154,10 @@ In the UI: **Sync → Platforms** lists each detected platform with an Import bu
 
 > Note: these proprietary tools' runtime stores change without notice. Import is a best-effort read; do not write back to `*_memory.md` or private sqlite/`.info` caches.
 
+## Write deduplication
+
+New writes **merge into an equivalent existing record instead of duplicating**: a matching non-empty `source` key, or an identical content fingerprint (whitespace/case-insensitive) within the same kind, updates the existing record (keeps its id, bumps `updatedAt`). On by default; disable per call (`create(..., { dedupe: false })`), per CLI (`--no-dedupe`), via config `{"dedupe": false}`, or env `MEMORYDEX_DEDUPE=0`.
+
 ## Scope & limits (lightweight by design)
 
 memorydex targets **personal / single-machine / small-team** use: one workspace's agent memory, local AGENTS.md ↔ memory upkeep, on the order of a few hundred to a few thousand records. It is intentionally **not** a multi-tenant or high-concurrency service:
