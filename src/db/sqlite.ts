@@ -7,7 +7,7 @@
  */
 import { DatabaseSync } from 'node:sqlite'
 import type { MemoryRecord } from '../core/types.ts'
-import type { MemoryStore } from './adapter.ts'
+import type { MemoryStore, AuditEntry } from './adapter.ts'
 
 /** SQLite-backed memory store. */
 export class SqliteStore implements MemoryStore {
@@ -38,6 +38,15 @@ export class SqliteStore implements MemoryStore {
       CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories(kind);
       CREATE INDEX IF NOT EXISTS idx_memories_source ON memories(source);
       CREATE INDEX IF NOT EXISTS idx_memories_updated ON memories(updated_at);
+      CREATE TABLE IF NOT EXISTS audits (
+        id TEXT PRIMARY KEY,
+        time INTEGER NOT NULL,
+        action TEXT NOT NULL,
+        record_id TEXT NOT NULL,
+        platform TEXT,
+        summary TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_audits_time ON audits(time);
     `)
   }
 
@@ -76,6 +85,16 @@ export class SqliteStore implements MemoryStore {
   async all(): Promise<MemoryRecord[]> {
     const rows = this.db.prepare('SELECT doc FROM memories').all() as { doc: string }[]
     return rows.map(row => JSON.parse(row.doc) as MemoryRecord)
+  }
+
+  async appendAudit(entry: AuditEntry): Promise<void> {
+    this.db.prepare('INSERT OR IGNORE INTO audits (id, time, action, record_id, platform, summary) VALUES (?,?,?,?,?,?)')
+      .run(entry.id, entry.time, entry.action, entry.recordId, entry.platform ?? null, entry.summary ?? null)
+  }
+
+  async listAudit(limit = 200): Promise<AuditEntry[]> {
+    const rows = this.db.prepare('SELECT id, time, action, record_id AS recordId, platform, summary FROM audits ORDER BY time DESC LIMIT ?').all(limit) as unknown as AuditEntry[]
+    return rows.map(r => ({ ...r }))
   }
 
   async close(): Promise<void> {

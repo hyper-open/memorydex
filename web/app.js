@@ -97,7 +97,8 @@ async function refresh() {
   await loadState()
   if (view === 'board') await loadBoard()
   else if (view === 'graph') await loadGraph()
-  else await loadSync()
+  else if (view === 'sync') await loadSync()
+  else await loadAudit()
 }
 
 // ---- Graph ----
@@ -136,6 +137,20 @@ async function loadGraph() {
   svg.innerHTML = heads + edges + dots
 }
 
+async function loadAudit() {
+  let data = { events: [] }
+  try { data = await api('/audit?limit=200') } catch { data = { events: [] } }
+  const list = el('#auditlist')
+  const rows = (data.events || []).map(e => {
+    const t = new Date(e.time).toLocaleString()
+    const color = { create: '#4fc08d', merge: '#e0a24a', update: '#5b9dd9', delete: '#d96d6d', import: '#9aa3b2' }[e.action] || '#9aa3b2'
+    return `<div class="filerow"><span style="flex:none;width:74px;color:${color};font-weight:600">${escapeHtml(e.action)}</span>
+      <span class="src" style="flex:none;width:150px">${escapeHtml(t)}</span>
+      <span style="flex:1;color:var(--muted)">${escapeHtml(e.summary || '')} <span class="src">· ${escapeHtml(String(e.recordId).slice(-8))}</span></span></div>`
+  }).join('')
+  list.innerHTML = rows || '<span class="empty">No audit events yet.</span>'
+}
+
 // ---- Platforms (import is the only write path in the UI) ----
 async function loadPlatforms() {
   let data = {}
@@ -156,15 +171,17 @@ async function loadSync() { await loadPlatforms() }
 // ---- tabs / toolbar ----
 function setView(v) {
   view = v
-  for (const [id, name] of [['#tabBoard', 'board'], ['#tabGraph', 'graph'], ['#tabSync', 'sync']]) el(id).classList.toggle('active', name === v)
+  for (const [id, name] of [['#tabBoard', 'board'], ['#tabGraph', 'graph'], ['#tabSync', 'sync'], ['#tabAudit', 'audit']]) el(id).classList.toggle('active', name === v)
   el('#boardView').classList.toggle('hidden', v !== 'board')
   el('#graphView').classList.toggle('hidden', v !== 'graph')
   el('#syncView').classList.toggle('hidden', v !== 'sync')
+  el('#auditView').classList.toggle('hidden', v !== 'audit')
   refresh()
 }
 el('#tabBoard').addEventListener('click', () => setView('board'))
 el('#tabGraph').addEventListener('click', () => setView('graph'))
 el('#tabSync').addEventListener('click', () => setView('sync'))
+el('#tabAudit').addEventListener('click', () => setView('audit'))
 el('#refreshBtn').addEventListener('click', () => { refresh().then(() => toast('Refreshed')) })
 el('#pinnedOnly').addEventListener('change', loadBoard)
 let searchTimer

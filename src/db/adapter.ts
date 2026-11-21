@@ -8,6 +8,22 @@
  */
 import type { MemoryRecord } from '../core/types.ts'
 
+/** One audit entry (a memory lifecycle event). */
+export interface AuditEntry {
+  /** Stable id. */
+  readonly id: string
+  /** Epoch millis. */
+  readonly time: number
+  /** Action kind. */
+  readonly action: 'create' | 'update' | 'merge' | 'delete' | 'import'
+  /** The affected memory record id. */
+  readonly recordId: string
+  /** Platform tag if known. */
+  readonly platform?: string
+  /** Short human summary of the change. */
+  readonly summary?: string
+}
+
 /** A store adapter backed by a concrete database. */
 export interface MemoryStore {
   /** Human label of the backend, e.g. 'sqlite' / 'pg'. */
@@ -24,4 +40,8 @@ export interface MemoryStore {
   all(): Promise<MemoryRecord[]>
   /** Close the connection/pool. */
   close(): Promise<void>
+  /** Append an audit entry (optional capability). */
+  appendAudit?(entry: AuditEntry): Promise<void>
+  /** List audit entries, newest first (optional capability). */
+  listAudit?(limit?: number): Promise<AuditEntry[]>
 }

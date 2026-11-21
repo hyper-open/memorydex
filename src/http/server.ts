@@ -126,6 +126,11 @@ async function handleApi(service: MemoryService, req: IncomingMessage, res: Serv
     json(res, 200, await pullFile(service, body.file))
     return
   }
+  if (rest[0] === 'audit' && method === 'GET') {
+    const limit = Number(url.searchParams.get('limit') ?? '200')
+    json(res, 200, { events: await service.audit_events(Number.isFinite(limit) ? limit : 200) })
+    return
+  }
   if (rest[0] === 'platforms' && method === 'GET') {
     const reg = defaultAdapters(homedir())
     const out: Record<string, { writable: boolean; files: string[] }> = {}

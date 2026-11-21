@@ -132,6 +132,10 @@ For `pg`/`mysql`: install the driver (`pg` / `mysql2`) and provide `db.url` (e.g
 
 `memorydex watch-platforms` polls each adapter's discovered files and re-imports any that changed (content-hash based, debounced, idempotent thanks to write dedupe). Good for keeping the store in sync with Claude/Codex/Codebuddy/WorkBuddy files without manual imports. Programmatic: `watchPlatforms(service, registry, { intervalMs, onChange })`.
 
+## Write audit
+
+Every create / update / merge / delete appends a lightweight audit event (time, action, record id, summary) to an `audits` table in the same store (when the backend supports it — SQLite does). View recent events with `memorydex audit [--limit N]`, `GET /api/audit`, or the **Audit** tab in the UI. Audit writes are best-effort and never block memory writes.
+
 ## Web UI: browse, search, delete (read-only)
 
 The web UI is **read-only for memory content**: it lists, searches, filters, shows the graph, deletes records, and offers **platform import**. Creating or editing a memory is done through the **SDK / HTTP API / MCP tools**, not the page — so a deployed UI can be handed to viewers without exposing content edits.

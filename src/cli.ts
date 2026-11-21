@@ -9,7 +9,8 @@
  *   memorydex list [--kind k] # list
  *   memorydex import <files..># one-click import AGENTS.md/CLAUDE.md
  *   memorydex sync [--push] [file]  # two-way sync
- *   memorydex stats
+ *   memorydex audit [--limit N]      Show recent write audit events
+  memorydex stats
   memorydex export [file.json]      Export all memories to a JSON bundle
   memorydex restore <file.json> [--replace]  Restore a bundle (merge|replace)
   memorydex reembed                 Recompute embeddings (after switching models)
@@ -90,6 +91,7 @@ Usage:
   memorydex sync [--push|--pull] [file]
   memorydex watch [file...]         Auto-sync file changes into memory
   memorydex watch-platforms         Auto-import changed platform memory files (Claude/Codebuddy/…)
+  memorydex audit [--limit N]      Show recent write audit events
   memorydex stats
   memorydex export [file.json]      Export all memories to a JSON bundle
   memorydex restore <file.json> [--replace]  Restore a bundle (merge|replace)
@@ -189,6 +191,9 @@ if (cmd === 'mcp') {
       const files = pos.length > 0 ? pos : undefined
       const res = await importPlatform(service, adapter, files)
       process.stdout.write(JSON.stringify(res.map(r => ({ platform: r.platform, location: r.location, imported: r.imported, updated: r.updated, unchanged: r.unchanged })), null, 2) + '\n')
+    } else if (cmd === 'audit') {
+      const limit = typeof flags.limit === 'string' ? Number(flags.limit) : 50
+      process.stdout.write(JSON.stringify(await service.audit_events(limit), null, 2) + '\n')
     } else if (cmd === 'stats') {
       process.stdout.write(JSON.stringify(await service.stats(), null, 2) + '\n')
     } else if (cmd === 'export') {

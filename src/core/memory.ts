@@ -7,7 +7,7 @@
  * to swap for vector search later.
  */
 import { randomUUID, createHash } from 'node:crypto'
-import type { MemoryStore } from '../db/adapter.ts'
+import type { MemoryStore, AuditEntry } from '../db/adapter.ts'
 import { cosine, HashingEmbedder, type Embedder } from './embedder.ts'
 import {
   MEMORY_KINDS,
@@ -125,6 +125,7 @@ export class MemoryService {
           ...(input.importance === undefined ? {} : { importance: input.importance }),
           ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
         }, now)
+        await this.audit('merge', existing.id, `merged write into existing (${input.kind})`)
         return merged ?? existing
       }
     }
@@ -149,6 +150,7 @@ export class MemoryService {
       ...(emb === undefined ? {} : { embedding: emb }),
     }
     await this.store.put(record)
+    await this.audit('create', record.id, `created ${record.kind}`)
     return record
   }
 
@@ -201,12 +203,15 @@ export class MemoryService {
         ? (() => { const { expiresAt: _drop, ...rest } = withEmb; return rest as MemoryRecord })()
         : { ...withEmb, expiresAt: patch.expiresAt }
     await this.store.put(withExpiry)
+    await this.audit('update', withExpiry.id, `updated fields: ${Object.keys(patch).join(',') || '(none)'}`)
     return withExpiry
   }
 
   /** Delete one record; returns whether it existed. */
   async delete(id: string): Promise<boolean> {
-    return this.store.delete(id)
+    const ok = await this.store.delete(id)
+    if (ok) await this.audit('delete', id, 'deleted')
+    return ok
   }
 
   /**
@@ -257,6 +262,19 @@ export class MemoryService {
     const offset = filter.offset ?? 0
     const limit = clampLimit(filter.limit)
     return scored.slice(offset, offset + limit)
+  }
+
+  /** Append an audit event if the store supports it (best-effort). */
+  private async audit(action: AuditEntry['action'], recordId: string, summary?: string, platform?: string): Promise<void> {
+    if (this.store.appendAudit === undefined) return
+    try {
+      await this.store.appendAudit({ id: mintId(), time: Date.now(), action, recordId, ...(platform === undefined ? {} : { platform }), ...(summary === undefined ? {} : { summary }) })
+    } catch { /* audit must never break writes */ }
+  }
+
+  /** List recent audit events (newest first), if the store supports auditing. */
+  async audit_events(limit = 200): Promise<AuditEntry[]> {
+    return this.store.listAudit === undefined ? [] : this.store.listAudit(limit)
   }
 
   /** Record an access (bumps accessCount/lastAccessedAt) — call when a hit is used. */

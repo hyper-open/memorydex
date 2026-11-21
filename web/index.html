@@ -81,6 +81,7 @@
     <button id="tabBoard" class="active">Board</button>
     <button id="tabGraph">Graph</button>
     <button id="tabSync">Sync</button>
+    <button id="tabAudit">Audit</button>
   </div>
 </header>
 
@@ -118,6 +119,10 @@
   </div>
 </div>
 
+<div id="auditView" class="hidden">
+  <div class="toolbar"><span style="color:var(--muted);font-size:12.5px">Recent write events (create/update/merge/delete), newest first.</span></div>
+  <div id="auditwrap" style="padding:0 18px 40px;max-width:820px"><div id="auditlist"></div></div>
+</div>
 <div class="toast" id="toast"></div>
 <script src="./app.js"></script>
 </body>
