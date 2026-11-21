@@ -4,8 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>memorydex</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%234fc08d'/%3E%3C/svg%3E" />
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --border:#2a2f3a; --text:#e6e8ee; --muted:#9aa3b2; --accent:#5b9dd9; --working:#8a7dff; --episodic:#e0a24a; --semantic:#4fc08d; --procedural:#d96d9c; }
+  :root { --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --border:#2a2f3a; --text:#e6e8ee; --muted:#9aa3b2; --accent:#5b9dd9; --working:#8a7dff; --episodic:#e0a24a; --semantic:#4fc08d; --procedural:#d96d9c; --danger:#d96d6d; }
   * { box-sizing: border-box; }
   body { margin:0; font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
   header { display:flex; align-items:center; gap:14px; padding:12px 18px; border-bottom:1px solid var(--border); background:var(--panel); position:sticky; top:0; z-index:5; }
@@ -13,12 +14,17 @@
   header .stats { color:var(--muted); font-size:12px; display:flex; gap:10px; }
   header .stats b { color:var(--text); }
   .spacer { flex:1; }
+  .tabs { display:flex; gap:4px; }
+  .tabs button { background:transparent; color:var(--muted); border:1px solid transparent; font-weight:600; padding:6px 12px; }
+  .tabs button.active { color:var(--text); background:var(--panel2); border-color:var(--border); }
   input, select, textarea, button { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:7px 10px; }
   button { cursor:pointer; background:var(--accent); border-color:transparent; color:#fff; font-weight:600; }
   button.ghost { background:transparent; color:var(--muted); border-color:var(--border); font-weight:500; }
   button.ghost:hover { color:var(--text); }
+  button.sm { padding:2px 8px; font-size:12px; font-weight:500; }
   .toolbar { display:flex; gap:10px; padding:12px 18px; flex-wrap:wrap; align-items:center; }
   .toolbar input.search { flex:1; min-width:220px; }
+  /* board */
   .layout { display:grid; grid-template-columns: repeat(4, 1fr); gap:14px; padding:0 18px 40px; }
   .col { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:120px; }
   .col h2 { font-size:13px; margin:0 0 10px; display:flex; align-items:center; gap:8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
@@ -27,26 +33,41 @@
   .count { margin-left:auto; color:var(--muted); font-weight:500; }
   .card { background:var(--panel2); border:1px solid var(--border); border-left:3px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; }
   .card.working{border-left-color:var(--working)} .card.episodic{border-left-color:var(--episodic)} .card.semantic{border-left-color:var(--semantic)} .card.procedural{border-left-color:var(--procedural)}
-  .card .t { font-weight:600; margin-bottom:4px; }
+  .card.pinned { box-shadow:0 0 0 1px var(--episodic) inset; }
+  .card .t { font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+  .pin { color:var(--episodic); font-size:13px; }
+  .pin.off { color:var(--border); }
   .card .c { color:var(--muted); font-size:12.5px; white-space:pre-wrap; max-height:120px; overflow:hidden; }
   .card .c.open { max-height:none; }
   .card .meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; align-items:center; }
   .tag { font-size:11px; padding:1px 7px; border-radius:999px; background:#2c3240; color:var(--muted); }
   .src { font-size:11px; color:var(--muted); }
-  .card .acts { margin-left:auto; display:flex; gap:6px; }
-  .card .acts button { padding:2px 8px; font-size:12px; font-weight:500; }
+  .impbar { height:4px; border-radius:2px; background:#2c3240; overflow:hidden; width:44px; }
+  .impbar > i { display:block; height:100%; background:var(--accent); }
+  .link { font-size:11px; color:var(--accent); background:transparent; border:1px solid var(--border); padding:0 6px; border-radius:999px; }
+  .acts { margin-left:auto; display:flex; gap:6px; }
   .empty { color:var(--muted); font-size:12.5px; padding:8px 2px; }
-  dialog { border:1px solid var(--border); background:var(--panel); color:var(--text); border-radius:14px; padding:0; width:min(560px,92vw); }
+  /* graph */
+  #graphwrap { padding:8px 18px 40px; }
+  svg.graph { width:100%; height:calc(100vh - 180px); background:var(--panel); border:1px solid var(--border); border-radius:12px; }
+  /* sync */
+  #syncwrap { padding:0 18px 40px; max-width:780px; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:14px; }
+  .panel h3 { margin:0 0 10px; font-size:14px; }
+  .filelist { display:flex; flex-direction:column; gap:6px; margin:10px 0; }
+  .filerow { display:flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:12.5px; }
+  dialog { border:1px solid var(--border); background:var(--panel); color:var(--text); border-radius:14px; padding:0; width:min(580px,92vw); }
   dialog::backdrop { background:rgba(0,0,0,.55); }
   .dlg { padding:18px; display:grid; gap:10px; }
   .dlg h3 { margin:0; font-size:15px; }
   .dlg label { font-size:12px; color:var(--muted); display:grid; gap:4px; }
   .dlg textarea { min-height:90px; resize:vertical; }
-  .dlg .row { display:flex; gap:10px; }
-  .dlg .row > label { flex:1; }
+  .dlg .row { display:flex; gap:10px; } .dlg .row > label { flex:1; }
   .dlg .actions { display:flex; gap:10px; justify-content:flex-end; margin-top:6px; }
+  .chk { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted); }
   .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--accent); color:#fff; padding:8px 16px; border-radius:999px; font-weight:600; opacity:0; transition:opacity .2s; pointer-events:none; }
   .toast.show { opacity:1; }
+  .hidden { display:none !important; }
   @media (max-width:1000px){ .layout{grid-template-columns:repeat(2,1fr)} }
   @media (max-width:640px){ .layout{grid-template-columns:1fr} }
 </style>
@@ -56,16 +77,50 @@
   <h1>memorydex</h1>
   <div class="stats" id="stats"></div>
   <div class="spacer"></div>
-  <button id="importBtn" class="ghost">Import files…</button>
-  <button id="syncBtn" class="ghost">Sync</button>
+  <div class="tabs">
+    <button id="tabBoard" class="active">Board</button>
+    <button id="tabGraph">Graph</button>
+    <button id="tabSync">Sync</button>
+  </div>
   <button id="newBtn">＋ New memory</button>
 </header>
-<div class="toolbar">
-  <input class="search" id="search" placeholder="Search memories (title / content / tags)…" />
-  <select id="tagFilter"><option value="">All tags</option></select>
-  <button class="ghost" id="refreshBtn">Refresh</button>
+
+<!-- Board -->
+<div id="boardView">
+  <div class="toolbar">
+    <input class="search" id="search" placeholder="Search memories (title / content / tags)…" />
+    <select id="tagFilter"><option value="">All tags</option></select>
+    <label class="chk"><input type="checkbox" id="pinnedOnly" /> Pinned only</label>
+    <button class="ghost" id="refreshBtn">Refresh</button>
+  </div>
+  <div class="layout" id="board"></div>
 </div>
-<div class="layout" id="board"></div>
+
+<!-- Graph -->
+<div id="graphView" class="hidden">
+  <div class="toolbar"><span style="color:var(--muted);font-size:12.5px">Memory graph — nodes are memories; lines are <code>links</code>. Drag to pan; scroll to zoom.</span></div>
+  <div id="graphwrap"><svg class="graph" id="graph"></svg></div>
+</div>
+
+<!-- Sync -->
+<div id="syncView" class="hidden">
+  <div id="syncwrap">
+    <div class="panel">
+      <h3>Import memory files</h3>
+      <p style="color:var(--muted);font-size:12.5px;margin:0 0 8px">Parse AGENTS.md / CLAUDE.md / any Markdown into memory (one record per heading section).</p>
+      <div style="display:flex;gap:8px"><input id="importPath" placeholder="file path(s), comma separated" style="flex:1" /><button id="importBtn">Import</button></div>
+    </div>
+    <div class="panel">
+      <h3>Sync tracked files</h3>
+      <p style="color:var(--muted);font-size:12.5px;margin:0 0 8px">Files currently backing memory records. Pull = file→memory, Push = memory→file.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="ghost" id="pullAllBtn">Pull all</button>
+        <button class="ghost" id="pushAllBtn">Push all</button>
+      </div>
+      <div class="filelist" id="filelist"><span class="empty">No tracked files yet — import a file first.</span></div>
+    </div>
+  </div>
+</div>
 
 <dialog id="dlg"><form class="dlg" method="dialog" id="dlgForm">
   <h3 id="dlgTitle">New memory</h3>
@@ -81,6 +136,8 @@
     <label>Tags (comma) <input name="tags" placeholder="a, b, c" /></label>
     <label>Importance (0-1) <input name="importance" type="number" min="0" max="1" step="0.1" value="0.5" /></label>
   </div>
+  <label>Links (memory ids, comma) <input name="links" placeholder="m-…, m-…" /></label>
+  <label class="chk"><input type="checkbox" name="pinned" /> Pinned (always ranks first)</label>
   <div class="actions">
     <button type="button" class="ghost" id="dlgCancel">Cancel</button>
     <button type="submit" id="dlgSave">Save</button>
