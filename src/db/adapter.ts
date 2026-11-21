@@ -44,4 +44,10 @@ export interface MemoryStore {
   appendAudit?(entry: AuditEntry): Promise<void>
   /** List audit entries, newest first (optional capability). */
   listAudit?(limit?: number): Promise<AuditEntry[]>
+  /**
+   * Approximate nearest-neighbour search by embedding (optional capability).
+   * Vector-store backends (Qdrant / pgvector) implement this for ANN; local
+   * backends omit it and fall back to in-memory scoring.
+   */
+  vectorSearch?(vector: readonly number[], limit: number): Promise<{ record: MemoryRecord; score: number }[]>
 }

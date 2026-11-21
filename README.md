@@ -93,7 +93,8 @@ Two **independent** dimensions — pick a storage mode, and separately decide wh
 | **remote** | external **vector store** (Qdrant) via `remote` config | large corpora / shared ANN index; needs a running Qdrant |
 | **cloud** | platform-hosted API (register + API key) | *not implemented in this build — throws from `openByMode('cloud', …)`* |
 
-- `mode` chooses **where** memories live; `embedding.enabled` + model config choose **whether/how** to do vector search. Any combination is valid: `local`+vector, `local`+lexical, `remote`+vector, `remote`+keyword-over-vector-payload, etc.
+- `mode` chooses **where** memories live; `embedding.enabled` + model config choose **whether/how** to do vector search.
+- **Remote backends use ANN**: when the store implements `vectorSearch` (Qdrant / pgvector) and a query embedding exists, `search()` fetches an ANN candidate set from the vector store, then re-ranks with the same blended score and applies structural filters (kind/tags/source) on the candidates — it does **not** scroll the whole collection into memory. Local (SQLite) has no `vectorSearch`, so it scores in-process. So remote genuinely accelerates large corpora. Any combination is valid: `local`+vector, `local`+lexical, `remote`+vector, `remote`+keyword-over-vector-payload, etc.
 - **remote** has two backends (selected by `remote.kind`):
   - `qdrant`: `{"kind":"qdrant","url":"http://127.0.0.1:6333","collection":"memorydex","dim":1024,"apiKey":""}` — the collection auto-creates. Verified against a live Qdrant.
   - `pgvector`: `{"kind":"pgvector","url":"postgres://user:pass@host:5432/db","collection":"memorydex","dim":1024}` — needs Postgres with `CREATE EXTENSION vector`; creates the table + HNSW cosine index. Verified against Postgres + pgvector 0.8.6 (write, scroll, `<=>` ANN search).

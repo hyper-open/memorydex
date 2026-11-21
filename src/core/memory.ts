@@ -235,33 +235,47 @@ export class MemoryService {
     const q = query.trim().toLowerCase()
     const qTerms = terms(q)
     const qVec = this.embedder !== undefined && q !== '' ? await this.embedText(query, '', []) : undefined
-    const candidates = (await this.store.all()).filter(r => matchesFilter(r, filter, now))
-    const scored: MemorySearchHit[] = candidates.map(record => {
-      const hay = `${record.title} ${record.content} ${record.tags.join(' ')}`.toLowerCase()
-      let lexical = 0
-      if (q !== '') {
-        if (record.title.toLowerCase().includes(q)) lexical += 3
-        if (hay.includes(q)) lexical += 2
-        const hayTerms = new Set(terms(hay))
-        let hits = 0
-        for (const t of qTerms) if (hayTerms.has(t)) hits += 1
-        lexical += qTerms.length === 0 ? 0 : (hits / qTerms.length) * 2
-      }
-      // Vector similarity (0..1) blended in when available.
-      let semantic = 0
-      if (qVec !== undefined && record.embedding !== undefined && record.embedding.length === qVec.length) {
-        semantic = Math.max(0, cosine(qVec, record.embedding)) * 4
-      }
-      const recency = recencyBoost(record.updatedAt, now)
-      const access = Math.min(1, (record.accessCount ?? 0) / 10) * 0.3
-      const pinned = record.pinned === true ? 100 : 0
-      const score = lexical + semantic + record.importance * 0.5 + recency + access + pinned
-      return { record, score }
-    })
-    scored.sort((a, b) => b.score - a.score)
     const offset = filter.offset ?? 0
     const limit = clampLimit(filter.limit)
+
+    // Remote vector stores: use ANN to fetch a candidate set, then re-rank with the
+    // same blended score (lexical + importance + recency + pinned). This avoids
+    // scrolling the whole collection into memory for the expensive part.
+    if (qVec !== undefined && this.store.vectorSearch !== undefined && q !== '') {
+      const pool = await this.store.vectorSearch(qVec, Math.max(limit * 4, 50))
+      const candidates = pool.map(p => p.record).filter(r => matchesFilter(r, filter, now))
+      const scored = candidates.map(record => ({ record, score: this.scoreRecord(record, q, qTerms, qVec, now) }))
+      scored.sort((a, b) => b.score - a.score)
+      return scored.slice(offset, offset + limit)
+    }
+
+    // Local / lexical path: score every (filtered) record.
+    const candidates = (await this.store.all()).filter(r => matchesFilter(r, filter, now))
+    const scored: MemorySearchHit[] = candidates.map(record => ({ record, score: this.scoreRecord(record, q, qTerms, qVec, now) }))
+    scored.sort((a, b) => b.score - a.score)
     return scored.slice(offset, offset + limit)
+  }
+
+  /** Blended relevance score for one record (lexical + vector + importance + recency + access + pinned). */
+  private scoreRecord(record: MemoryRecord, q: string, qTerms: string[], qVec: number[] | undefined, now: number): number {
+    const hay = `${record.title} ${record.content} ${record.tags.join(' ')}`.toLowerCase()
+    let lexical = 0
+    if (q !== '') {
+      if (record.title.toLowerCase().includes(q)) lexical += 3
+      if (hay.includes(q)) lexical += 2
+      const hayTerms = new Set(terms(hay))
+      let hits = 0
+      for (const t of qTerms) if (hayTerms.has(t)) hits += 1
+      lexical += qTerms.length === 0 ? 0 : (hits / qTerms.length) * 2
+    }
+    let semantic = 0
+    if (qVec !== undefined && record.embedding !== undefined && record.embedding.length === qVec.length) {
+      semantic = Math.max(0, cosine(qVec, record.embedding)) * 4
+    }
+    const recency = recencyBoost(record.updatedAt, now)
+    const access = Math.min(1, (record.accessCount ?? 0) / 10) * 0.3
+    const pinned = record.pinned === true ? 100 : 0
+    return lexical + semantic + record.importance * 0.5 + recency + access + pinned
   }
 
   /** Append an audit event if the store supports it (best-effort). */
