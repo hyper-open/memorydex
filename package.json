@@ -1,0 +1,57 @@
+{
+  "name": "memorydex",
+  "version": "0.1.0",
+  "description": "A general-purpose AI memory system: multi-database, four cognitive memory kinds (working/episodic/semantic/procedural), import & two-way sync with AGENTS.md/CLAUDE.md, exposed over MCP and HTTP with a web UI. Not tied to any single agent.",
+  "type": "module",
+  "bin": {
+    "memorydex": "./lib/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    },
+    "./mcp": {
+      "types": "./lib/mcp/index.d.ts",
+      "import": "./lib/mcp/index.js"
+    },
+    "./http": {
+      "types": "./lib/http/index.d.ts",
+      "import": "./lib/http/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "web",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --watch --import tsx src/cli.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "start": "node lib/cli.js serve"
+  },
+  "dependencies": {
+    "zod": "^3.24.0",
+    "@modelcontextprotocol/sdk": "^1.32.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "keywords": [
+    "memory",
+    "mcp",
+    "ai",
+    "agents",
+    "sqlite",
+    "knowledge",
+    "dsh"
+  ],
+  "license": "MIT"
+}
