@@ -42,6 +42,8 @@ export function buildMcpServer(service: MemoryService): McpServer {
         source: z.string().optional(),
         metadata: z.record(z.unknown()).optional(),
         expiresAt: z.number().int().optional().describe('epoch millis for working memory TTL'),
+        links: z.array(z.string()).optional().describe('related memory ids'),
+        pinned: z.boolean().optional(),
       },
     },
     async (args) => ok(await service.create({ ...args, kind: args.kind as MemoryKind, origin: 'agent' })),
@@ -101,6 +103,8 @@ export function buildMcpServer(service: MemoryService): McpServer {
         source: z.string().optional(),
         metadata: z.record(z.unknown()).optional(),
         expiresAt: z.number().int().nullable().optional(),
+        links: z.array(z.string()).optional(),
+        pinned: z.boolean().optional(),
       },
     },
     async ({ id, ...patch }) => ok(await service.update(id, patch) ?? { error: 'not found', id }),
@@ -110,6 +114,18 @@ export function buildMcpServer(service: MemoryService): McpServer {
     'memory_delete',
     { title: 'Delete a memory', description: 'Delete a memory record by id.', inputSchema: { id: z.string() } },
     async (args) => ok({ deleted: await service.delete(args.id), id: args.id }),
+  )
+
+  server.registerTool(
+    'memory_touch',
+    { title: 'Touch a memory', description: 'Bump a memory access count (call when you actually use a hit).', inputSchema: { id: z.string() } },
+    async (args) => { await service.touch(args.id); return ok({ touched: true, id: args.id }) },
+  )
+
+  server.registerTool(
+    'memory_pin',
+    { title: 'Pin/unpin a memory', description: 'Pinned memories rank above unpinned in search.', inputSchema: { id: z.string(), pinned: z.boolean().default(true) } },
+    async (args) => ok(await service.update(args.id, { pinned: args.pinned }) ?? { error: 'not found', id: args.id }),
   )
 
   server.registerTool(

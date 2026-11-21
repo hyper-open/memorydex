@@ -23,6 +23,7 @@ import { importFiles } from './import/markdown.ts'
 import { serveMcpStdio } from './mcp/server.ts'
 import { startHttpServer } from './http/server.ts'
 import { pullFile, pushFile, reconcileFile } from './sync/files.ts'
+import { watchFiles } from './sync/watch.ts'
 
 /** Parse argv into { cmd, positionals, flags }. */
 function parseArgs(argv: string[]): { cmd: string; pos: string[]; flags: Record<string, string | boolean> } {
@@ -65,6 +66,7 @@ Usage:
   memorydex list [--kind K] [--tags a,b]
   memorydex import <file...>          Import AGENTS.md/CLAUDE.md/any .md
   memorydex sync [--push|--pull] [file]
+  memorydex watch [file...]         Auto-sync file changes into memory
   memorydex stats
 
 Flags: --db <sqlite|pg|mysql>  --db-path <sqlite file>  --db-url <pg/mysql url>  --config <file>
@@ -84,6 +86,20 @@ if (cmd === 'mcp') {
   const port = typeof flags.port === 'string' ? Number(flags.port) : config.port
   startHttpServer(service, webDir, config.host, port)
   process.stdout.write(`memorydex UI + API on http://${config.host}:${port}\n`)
+} else if (cmd === 'watch') {
+  const { service, close } = await openService(flags)
+  const files = pos.length > 0 ? pos : undefined
+  const handle = await watchFiles(service, files, {
+    onSync: (f, a, u, r) => process.stdout.write(`synced ${f}: +${a} ~${u} -${r}\n`),
+    onError: (f, e) => process.stderr.write(`watch error ${f}: ${String(e)}\n`),
+  })
+  process.stdout.write(`watching ${handle.files().length} file(s); Ctrl-C to stop\n`)
+  // Keep the process alive; close cleanly on Ctrl-C.
+  await new Promise<void>(resolve => {
+    const stop = (): void => { handle.close(); void close().finally(() => resolve()) }
+    process.once('SIGINT', stop)
+    process.once('SIGTERM', stop)
+  })
 } else {
   const { service, close } = await openService(flags)
   try {

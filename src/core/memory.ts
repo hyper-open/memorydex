@@ -8,6 +8,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import type { MemoryStore } from '../db/adapter.ts'
+import { cosine, HashingEmbedder, type Embedder } from './embedder.ts'
 import {
   MEMORY_KINDS,
   type MemoryCreateInput,
@@ -46,7 +47,23 @@ export class MemoryService {
   /**
    * @param store - the backing store adapter.
    */
-  constructor(private readonly store: MemoryStore) {}
+  private readonly embedder: Embedder | undefined
+
+  /**
+   * @param store - the backing store adapter.
+   * @param embedder - optional embedder for semantic retrieval; defaults to a
+   *   zero-dependency {@link HashingEmbedder} so vector recall works out of the box.
+   *   Pass `null` to disable embeddings (pure lexical).
+   */
+  constructor(private readonly store: MemoryStore, embedder: Embedder | null = new HashingEmbedder()) {
+    this.embedder = embedder ?? undefined
+  }
+
+  /** Compute an embedding for a record's text, or undefined when disabled. */
+  private embedText(title: string, content: string, tags: readonly string[]): number[] | undefined {
+    if (this.embedder === undefined) return undefined
+    return this.embedder.embed(`${title}\n${content}\n${tags.join(' ')}`)
+  }
 
   /** Create and persist a new memory record. */
   async create(input: MemoryCreateInput, now = Date.now()): Promise<MemoryRecord> {
@@ -65,6 +82,9 @@ export class MemoryService {
       createdAt: now,
       updatedAt: now,
       ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
+      ...(input.links === undefined ? {} : { links: dedupeTags(input.links) }),
+      ...(input.pinned === true ? { pinned: true } : {}),
+      ...(this.embedder === undefined ? {} : { embedding: this.embedText(input.title, input.content, input.tags ?? []) }),
     }
     await this.store.put(record)
     return record
@@ -92,14 +112,20 @@ export class MemoryService {
       ...(patch.importance === undefined ? {} : { importance: clampImportance(patch.importance) }),
       ...(patch.source === undefined ? {} : { source: patch.source }),
       ...(patch.metadata === undefined ? {} : { metadata: { ...current.metadata, ...patch.metadata } }),
+      ...(patch.links === undefined ? {} : { links: dedupeTags(patch.links) }),
+      ...(patch.pinned === undefined ? {} : { pinned: patch.pinned }),
       updatedAt: now,
     }
+    // Re-embed when title/content/tags changed.
+    const withEmb: MemoryRecord = (this.embedder === undefined || (patch.title === undefined && patch.content === undefined && patch.tags === undefined))
+      ? next
+      : { ...next, embedding: this.embedText(next.title, next.content, next.tags) }
     // expiresAt: null explicitly clears; number sets; undefined leaves unchanged.
     const withExpiry: MemoryRecord = patch.expiresAt === undefined
-      ? next
+      ? withEmb
       : patch.expiresAt === null
-        ? (() => { const { expiresAt: _drop, ...rest } = next; return rest as MemoryRecord })()
-        : { ...next, expiresAt: patch.expiresAt }
+        ? (() => { const { expiresAt: _drop, ...rest } = withEmb; return rest as MemoryRecord })()
+        : { ...withEmb, expiresAt: patch.expiresAt }
     await this.store.put(withExpiry)
     return withExpiry
   }
@@ -129,6 +155,7 @@ export class MemoryService {
   async search(query: string, filter: MemoryFilter = {}, now = Date.now()): Promise<MemorySearchHit[]> {
     const q = query.trim().toLowerCase()
     const qTerms = terms(q)
+    const qVec = this.embedder !== undefined && q !== '' ? this.embedder.embed(query) : undefined
     const candidates = (await this.store.all()).filter(r => matchesFilter(r, filter, now))
     const scored: MemorySearchHit[] = candidates.map(record => {
       const hay = `${record.title} ${record.content} ${record.tags.join(' ')}`.toLowerCase()
@@ -141,15 +168,28 @@ export class MemoryService {
         for (const t of qTerms) if (hayTerms.has(t)) hits += 1
         lexical += qTerms.length === 0 ? 0 : (hits / qTerms.length) * 2
       }
-      const tagBonus = filter.tags === undefined ? 0 : 0 // structured match already required
+      // Vector similarity (0..1) blended in when available.
+      let semantic = 0
+      if (qVec !== undefined && record.embedding !== undefined && record.embedding.length === qVec.length) {
+        semantic = Math.max(0, cosine(qVec, record.embedding)) * 4
+      }
       const recency = recencyBoost(record.updatedAt, now)
-      const score = lexical + (q === '' ? 0 : 0) + record.importance * 0.5 + recency + tagBonus
+      const access = Math.min(1, (record.accessCount ?? 0) / 10) * 0.3
+      const pinned = record.pinned === true ? 100 : 0
+      const score = lexical + semantic + record.importance * 0.5 + recency + access + pinned
       return { record, score }
     })
     scored.sort((a, b) => b.score - a.score)
     const offset = filter.offset ?? 0
     const limit = filter.limit ?? Number.POSITIVE_INFINITY
     return scored.slice(offset, offset + limit)
+  }
+
+  /** Record an access (bumps accessCount/lastAccessedAt) — call when a hit is used. */
+  async touch(id: string, now = Date.now()): Promise<void> {
+    const current = await this.store.get(id)
+    if (current === undefined) return
+    await this.store.put({ ...current, accessCount: (current.accessCount ?? 0) + 1, lastAccessedAt: now })
   }
 
   /** Aggregate counts by kind (and totals). */
@@ -184,6 +224,7 @@ function matchesFilter(r: MemoryRecord, filter: MemoryFilter, now: number): bool
   if (filter.source !== undefined && r.source !== filter.source) return false
   if (filter.origin !== undefined && r.origin !== filter.origin) return false
   if (filter.updatedAfter !== undefined && r.updatedAt < filter.updatedAfter) return false
+  if (filter.pinned !== undefined && (r.pinned === true) !== filter.pinned) return false
   if (filter.tags !== undefined && filter.tags.length > 0) {
     const lowered = new Set(r.tags.map(t => t.toLowerCase()))
     if (filter.tags.some(t => !lowered.has(t.toLowerCase()))) return false

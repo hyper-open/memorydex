@@ -43,6 +43,16 @@ export interface MemoryRecord {
   readonly updatedAt: number
   /** Expiry for short-lived working memory (epoch millis); undefined = never. */
   readonly expiresAt?: number
+  /** Ids of related memory records (a lightweight graph). */
+  readonly links?: readonly string[]
+  /** Pinned records always rank above unpinned in retrieval. */
+  readonly pinned?: boolean
+  /** How many times this record has been returned by search/get. */
+  readonly accessCount?: number
+  /** Epoch millis of the last access. */
+  readonly lastAccessedAt?: number
+  /** Optional precomputed embedding vector (set by an embedder). */
+  readonly embedding?: readonly number[]
 }
 
 /** A record with its embedding-free text used for retrieval. */
@@ -63,6 +73,8 @@ export interface MemoryCreateInput {
   readonly source?: string
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly expiresAt?: number
+  readonly links?: readonly string[]
+  readonly pinned?: boolean
 }
 
 /** Input for updating a memory record (partial). */
@@ -75,6 +87,8 @@ export interface MemoryUpdateInput {
   readonly source?: string
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly expiresAt?: number | null
+  readonly links?: readonly string[]
+  readonly pinned?: boolean
 }
 
 /** Filter for listing/searching. */
@@ -87,6 +101,8 @@ export interface MemoryFilter {
   readonly updatedAfter?: number
   /** Include expired working memory (default false). */
   readonly includeExpired?: boolean
+  /** Only pinned (true) / only unpinned (false) when set. */
+  readonly pinned?: boolean
   /** Max results. */
   readonly limit?: number
   /** Offset for paging. */

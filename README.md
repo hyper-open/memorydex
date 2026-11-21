@@ -28,6 +28,9 @@ memorydex import AGENTS.md CLAUDE.md
 memorydex search "deploy"
 memorydex list --kind procedural
 memorydex stats
+
+# Watch tracked files and auto-pull changes into memory
+memorydex watch
 ```
 
 ## Connect an agent over MCP
@@ -49,7 +52,7 @@ MCP is the universal entry point. Any agent that can run an MCP stdio server can
 
 **Claude Code / Cursor / others**: add a stdio MCP server with command `memorydex`, args `["mcp"]`.
 
-The agent then gets tools: `memory_write`, `memory_search`, `memory_list`, `memory_get`, `memory_update`, `memory_delete`, `memory_stats`, `memory_import`, `memory_sync`.
+The agent then gets tools: `memory_write`, `memory_search`, `memory_list`, `memory_get`, `memory_update`, `memory_delete`, `memory_touch`, `memory_pin`, `memory_stats`, `memory_import`, `memory_sync`.
 
 ## Memory model
 
@@ -62,7 +65,9 @@ The agent then gets tools: `memory_write`, `memory_search`, `memory_list`, `memo
 
 Each record: `id, kind, title, content, tags[], importance(0-1), origin, source?, metadata, createdAt, updatedAt, expiresAt?`.
 
-Retrieval is lexical (title/content/tag overlap) blended with importance and recency — no embeddings required, so it works on every backend and offline. Swap in vector search later without changing the model.
+**Retrieval** blends three signals: lexical overlap (title/content/tag), **vector similarity** (cosine over a dependency-free hashing embedding that works offline and handles CJK), plus importance, recency, access-count and a pinned bonus. Plug a real model by implementing the `Embedder` interface (`src/core/embedder.ts`) and passing it to `new MemoryService(store, embedder)`; pass `null` for pure lexical.
+
+**Extra fields**: `links[]` (a light graph), `pinned` (always ranks first), `accessCount`/`lastAccessedAt` (bumped by `touch`), and an optional `embedding`.
 
 ## Import & sync
 
@@ -72,6 +77,7 @@ Two-way sync:
 - `memorydex sync --pull [file]` — file → memory (new/changed sections create/update; removed sections delete).
 - `memorydex sync --push [file]` — memory → file (rewrite the file from its records).
 - Programmatic: `reconcileFile()` decides direction from a content hash.
+- **Auto-sync**: `memorydex watch [files…]` (or `watchFiles()`) watches tracked files and pulls changes into memory automatically (debounced).
 
 ## Configuration
 
