@@ -12,12 +12,12 @@
       "import": "./lib/index.js"
     },
     "./mcp": {
-      "types": "./lib/mcp/index.d.ts",
-      "import": "./lib/mcp/index.js"
+      "types": "./lib/mcp/server.d.ts",
+      "import": "./lib/mcp/server.js"
     },
     "./http": {
-      "types": "./lib/http/index.d.ts",
-      "import": "./lib/http/index.js"
+      "types": "./lib/http/server.d.ts",
+      "import": "./lib/http/server.js"
     }
   },
   "files": [
