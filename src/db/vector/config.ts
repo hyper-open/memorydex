@@ -1,8 +1,8 @@
 /** Configuration for a remote vector store (mode=remote). */
 export interface VectorStoreConfig {
-  /** Backend kind. Currently 'qdrant'. */
-  readonly kind: 'qdrant'
-  /** Base URL, e.g. http://127.0.0.1:6333. */
+  /** Backend kind: 'qdrant' (REST) or 'pgvector' (PostgreSQL extension). */
+  readonly kind: 'qdrant' | 'pgvector'
+  /** Qdrant base URL (e.g. http://127.0.0.1:6333) OR pgvector Postgres URL (postgres://…). */
   readonly url?: string
   /** Collection name. */
   readonly collection?: string

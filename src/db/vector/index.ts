@@ -1,6 +1,7 @@
 /** Remote (vector store) backend factory. */
 import type { MemoryStore } from '../adapter.ts'
 import { QdrantStore } from './qdrant.ts'
+import { PgVectorStore } from './pgvector.ts'
 import type { VectorStoreConfig } from './config.ts'
 
 /**
@@ -11,6 +12,7 @@ export async function openVectorStore(config: VectorStoreConfig): Promise<Memory
   let store: MemoryStore
   switch (config.kind) {
     case 'qdrant': store = new QdrantStore(config); break
+    case 'pgvector': store = new PgVectorStore(config); break
     default: {
       const exhaustive: never = config.kind
       throw new Error(`Unknown vector backend: ${String(exhaustive)}`)
@@ -21,4 +23,5 @@ export async function openVectorStore(config: VectorStoreConfig): Promise<Memory
 }
 
 export { QdrantStore } from './qdrant.ts'
+export { PgVectorStore } from './pgvector.ts'
 export type { VectorStoreConfig } from './config.ts'

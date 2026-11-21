@@ -94,7 +94,10 @@ Two **independent** dimensions — pick a storage mode, and separately decide wh
 | **cloud** | platform-hosted API (register + API key) | *not implemented in this build — throws from `openByMode('cloud', …)`* |
 
 - `mode` chooses **where** memories live; `embedding.enabled` + model config choose **whether/how** to do vector search. Any combination is valid: `local`+vector, `local`+lexical, `remote`+vector, `remote`+keyword-over-vector-payload, etc.
-- **remote**: `{"remote": {"kind":"qdrant","url":"http://127.0.0.1:6333","collection":"memorydex","dim":1024,"apiKey":""}}`. Requires Qdrant; the collection auto-creates on first use. CLI: `--mode remote --vector-url … --vector-key … --vector-collection …`. Verified end-to-end against a live Qdrant (writes, scroll, vector search).
+- **remote** has two backends (selected by `remote.kind`):
+  - `qdrant`: `{"kind":"qdrant","url":"http://127.0.0.1:6333","collection":"memorydex","dim":1024,"apiKey":""}` — the collection auto-creates. Verified against a live Qdrant.
+  - `pgvector`: `{"kind":"pgvector","url":"postgres://user:pass@host:5432/db","collection":"memorydex","dim":1024}` — needs Postgres with `CREATE EXTENSION vector`; creates the table + HNSW cosine index. Verified against Postgres + pgvector 0.8.6 (write, scroll, `<=>` ANN search).
+  CLI: `--mode remote --vector-url … [--vector-key …] [--vector-collection …]` (kind from `remote.kind` in config).
 - `cloud` mode is a placeholder for a future platform API (registration + key); selecting it raises a clear "not configured" error today.
 
 ## Configuration
