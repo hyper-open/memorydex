@@ -85,7 +85,16 @@ Defaults to SQLite at `~/.memorydex/memory.db`, port `7567`. Override via `memor
 }
 ```
 
-Env: `MEMORYDEX_DB` (`sqlite|pg|mysql`), `MEMORYDEX_DB_PATH`, `MEMORYDEX_PORT`.
+Env: `MEMORYDEX_DB` (`sqlite|pg|mysql`), `MEMORYDEX_DB_PATH`, `MEMORYDEX_DB_URL`, `MEMORYDEX_PORT`.
+
+CLI flags: `--db <sqlite|pg|mysql>`, `--db-path <sqlite file>`, `--db-url <pg/mysql url>`.
+
+**Postgres / MySQL** are implemented adapters (tested against live PG 17 and MySQL 9). Install the driver once: `npm i pg` and/or `npm i mysql2` (they are `optionalDependencies`). Example:
+
+```bash
+memorydex --db pg --db-url 'postgres://user:pass@host:5432/db' stats
+memorydex --db mysql --db-url 'mysql://user:pass@host:3306/db' stats
+```
 
 For `pg`/`mysql`: install the driver (`pg` / `mysql2`) and provide `db.url` (e.g. `postgres://user:pass@host/db`). The SQL adapter interface is `MemoryStore` (`src/db/adapter.ts`) — any backend implementing it works.
 

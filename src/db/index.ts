@@ -7,6 +7,8 @@
  * one, install its driver (e.g. `pg` or `mysql2`) and provide a connection.
  */
 import { SqliteStore } from './sqlite.ts'
+import { PgStore } from './pg.ts'
+import { MysqlStore } from './mysql.ts'
 import type { MemoryStore } from './adapter.ts'
 
 /** Configuration for an SQL-family backend. */
@@ -36,18 +38,14 @@ export async function openStore(config: DbConfig = DEFAULT_DB): Promise<MemorySt
       store = new SqliteStore(config.path ?? ':memory:')
       break
     }
-    case 'pg':
+    case 'pg': {
+      if (config.url === undefined || config.url === '') throw new Error('The "pg" backend requires db.url (postgres://…).')
+      store = new PgStore(config.url, config.table)
+      break
+    }
     case 'mysql': {
-      // Lazy, optional adapters. Kept out of the default dependency set.
-      const mod = await import(`./${config.kind}.ts`).catch(() => undefined)
-      if (mod === undefined) {
-        throw new Error(`The "${config.kind}" backend is not available in this build. Install its driver and adapter, or use sqlite.`)
-      }
-      const Ctor = (mod as { [k: string]: unknown })[config.kind === 'pg' ? 'PgStore' : 'MysqlStore'] as
-        | (new (url: string, table?: string) => MemoryStore)
-        | undefined
-      if (Ctor === undefined) throw new Error(`Adapter for "${config.kind}" missing an exported store class.`)
-      store = new Ctor(config.url ?? '', config.table)
+      if (config.url === undefined || config.url === '') throw new Error('The "mysql" backend requires db.url (mysql://…).')
+      store = new MysqlStore(config.url, config.table)
       break
     }
     default: {

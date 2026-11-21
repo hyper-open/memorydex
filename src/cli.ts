@@ -10,7 +10,7 @@
  *   memorydex import <files..># one-click import AGENTS.md/CLAUDE.md
  *   memorydex sync [--push] [file]  # two-way sync
  *   memorydex stats
- * Common flags: --db <sqlite|pg|mysql> --db-path <path> --config <file>
+ * Common flags: --db <sqlite|pg|mysql> --db-path <path> --db-url <url> --config <file>
  */
 import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -47,6 +47,7 @@ async function openService(flags: Record<string, string | boolean>): Promise<{ s
   const db = { ...config.db }
   if (typeof flags.db === 'string') (db as { kind: string }).kind = flags.db
   if (typeof flags['db-path'] === 'string') (db as { path: string }).path = flags['db-path']
+  if (typeof flags['db-url'] === 'string') (db as { url: string }).url = flags['db-url']
   if (db.kind === 'sqlite' && db.path !== ':memory:') await mkdir(dirname(db.path!), { recursive: true })
   const store = await openStore(db)
   const service = new MemoryService(store)
@@ -66,7 +67,7 @@ Usage:
   memorydex sync [--push|--pull] [file]
   memorydex stats
 
-Flags: --db <sqlite|pg|mysql>  --db-path <path>  --config <file>
+Flags: --db <sqlite|pg|mysql>  --db-path <sqlite file>  --db-url <pg/mysql url>  --config <file>
 Kinds: ${MEMORY_KINDS.join(', ')}
 `)
 }

@@ -30,7 +30,7 @@ export function defaultConfig(): MemorydexConfig {
 
 /**
  * Load config from a file path (if it exists) merged over defaults.
- * Env: MEMORYDEX_CONFIG, MEMORYDEX_DB (kind), MEMORYDEX_DB_PATH, MEMORYDEX_PORT.
+ * Env: MEMORYDEX_CONFIG, MEMORYDEX_DB (kind), MEMORYDEX_DB_PATH, MEMORYDEX_DB_URL, MEMORYDEX_PORT.
  */
 export function loadConfig(explicitPath?: string): MemorydexConfig {
   const base = defaultConfig()
@@ -47,6 +47,7 @@ export function loadConfig(explicitPath?: string): MemorydexConfig {
     ...file.db,
     ...(dbKind === 'sqlite' || dbKind === 'pg' || dbKind === 'mysql' ? { kind: dbKind } : {}),
     ...(process.env.MEMORYDEX_DB_PATH === undefined ? {} : { path: process.env.MEMORYDEX_DB_PATH }),
+    ...(process.env.MEMORYDEX_DB_URL === undefined ? {} : { url: process.env.MEMORYDEX_DB_URL }),
   }
   return {
     db,
