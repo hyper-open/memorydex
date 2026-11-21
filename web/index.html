@@ -82,7 +82,6 @@
     <button id="tabGraph">Graph</button>
     <button id="tabSync">Sync</button>
   </div>
-  <button id="newBtn">＋ New memory</button>
 </header>
 
 <!-- Board -->
@@ -116,39 +115,9 @@
       <p style="color:var(--muted);font-size:12.5px;margin:0 0 8px">Parse AGENTS.md / CLAUDE.md / any Markdown into memory (one record per heading section).</p>
       <div style="display:flex;gap:8px"><input id="importPath" placeholder="file path(s), comma separated" style="flex:1" /><button id="importBtn">Import</button></div>
     </div>
-    <div class="panel">
-      <h3>Sync tracked files</h3>
-      <p style="color:var(--muted);font-size:12.5px;margin:0 0 8px">Files currently backing memory records. Pull = file→memory, Push = memory→file.</p>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button class="ghost" id="pullAllBtn">Pull all</button>
-        <button class="ghost" id="pushAllBtn">Push all</button>
-      </div>
-      <div class="filelist" id="filelist"><span class="empty">No tracked files yet — import a file first.</span></div>
-    </div>
   </div>
 </div>
 
-<dialog id="dlg"><form class="dlg" method="dialog" id="dlgForm">
-  <h3 id="dlgTitle">New memory</h3>
-  <label>Kind
-    <select name="kind">
-      <option value="working">working</option><option value="episodic">episodic</option>
-      <option value="semantic" selected>semantic</option><option value="procedural">procedural</option>
-    </select>
-  </label>
-  <label>Title <input name="title" required /></label>
-  <label>Content <textarea name="content"></textarea></label>
-  <div class="row">
-    <label>Tags (comma) <input name="tags" placeholder="a, b, c" /></label>
-    <label>Importance (0-1) <input name="importance" type="number" min="0" max="1" step="0.1" value="0.5" /></label>
-  </div>
-  <label>Links (memory ids, comma) <input name="links" placeholder="m-…, m-…" /></label>
-  <label class="chk"><input type="checkbox" name="pinned" /> Pinned (always ranks first)</label>
-  <div class="actions">
-    <button type="button" class="ghost" id="dlgCancel">Cancel</button>
-    <button type="submit" id="dlgSave">Save</button>
-  </div>
-</form></dialog>
 <div class="toast" id="toast"></div>
 <script src="./app.js"></script>
 </body>

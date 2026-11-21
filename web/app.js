@@ -5,7 +5,6 @@ const api = (path, opts) => fetch(`/api${path}`, opts).then(r => r.json())
 const el = (sel) => document.querySelector(sel)
 const board = el('#board')
 const toastEl = el('#toast')
-let editingId = null
 let cached = []           // last fetched memories
 let view = 'board'
 
@@ -56,7 +55,7 @@ function cardHtml(m) {
   const imp = typeof m.importance === 'number' ? m.importance : 0.5
   return `<article class="card ${m.kind} ${m.pinned ? 'pinned' : ''}" data-id="${escapeAttr(m.id)}">
     <div class="t">
-      <button class="link pin ${m.pinned ? '' : 'off'}" data-act="pin" title="Toggle pinned">${m.pinned ? '★' : '☆'}</button>
+      ${m.pinned ? '<span class="pin" title="pinned">★</span>' : ''}
       <span>${escapeHtml(m.title)}</span>
     </div>
     <div class="c">${escapeHtml(m.content)}</div>
@@ -68,7 +67,6 @@ function cardHtml(m) {
       ${(m.links || []).map(id => `<button class="link" data-act="goto" data-target="${escapeAttr(id)}" title="linked memory">↔ ${escapeHtml(String(id).slice(-6))}</button>`).join('')}
       ${m.source ? `<span class="src">· ${escapeHtml(m.source.split('#')[0].split('/').pop())}${m.source.includes('#') ? '#' + escapeHtml(m.source.split('#')[1]) : ''}</span>` : ''}
       <div class="acts">
-        <button class="ghost sm" data-act="edit">Edit</button>
         <button class="ghost sm" data-act="del">Delete</button>
       </div>
     </div>
@@ -79,12 +77,6 @@ function wireCards() {
   board.querySelectorAll('.card').forEach(card => {
     const id = card.dataset.id
     card.querySelector('.c')?.addEventListener('click', e => e.currentTarget.classList.toggle('open'))
-    card.querySelector('[data-act="pin"]')?.addEventListener('click', async () => {
-      const m = cached.find(x => x.id === id); if (!m) return
-      await api(`/memories/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pinned: !m.pinned }) })
-      toast(m.pinned ? 'Unpinned' : 'Pinned'); await refresh()
-    })
-    card.querySelector('[data-act="edit"]')?.addEventListener('click', () => openEdit(id))
     card.querySelector('[data-act="del"]')?.addEventListener('click', async () => {
       if (!confirm('Delete this memory?')) return
       await api(`/memories/${encodeURIComponent(id)}`, { method: 'DELETE' }); toast('Deleted'); await refresh()
@@ -144,23 +136,7 @@ async function loadGraph() {
   svg.innerHTML = heads + edges + dots
 }
 
-// ---- Sync ----
-async function loadSync() {
-  loadPlatforms()
-  const { files } = await api('/tracked')
-  const list = el('#filelist')
-  if (!files || files.length === 0) { list.innerHTML = '<span class="empty">No tracked files yet — import a file first.</span>'; return }
-  list.innerHTML = files.map(f => `<div class="filerow"><span style="flex:1;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f)}</span>
-    <button class="ghost sm" data-pull="${escapeAttr(f)}">Pull</button>
-    <button class="ghost sm" data-push="${escapeAttr(f)}">Push</button></div>`).join('')
-  list.querySelectorAll('[data-pull]').forEach(b => b.addEventListener('click', () => doSync(b.dataset.pull, 'pull')))
-  list.querySelectorAll('[data-push]').forEach(b => b.addEventListener('click', () => doSync(b.dataset.push, 'push')))
-}
-async function doSync(file, direction) {
-  const r = await api('/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ file, direction }) })
-  toast(`${direction} ${file.split('/').pop()}: +${r.added ?? 0} ~${r.updated ?? 0} -${r.removed ?? 0}`); await loadSync()
-}
-
+// ---- Platforms (import is the only write path in the UI) ----
 async function loadPlatforms() {
   let data = {}
   try { data = await api('/platforms') } catch { data = {} }
@@ -172,42 +148,10 @@ async function loadPlatforms() {
   list.querySelectorAll('[data-plat]').forEach(b => b.addEventListener('click', async () => {
     const r = await api('/import-platform', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ platform: b.dataset.plat }) })
     const n = (r || []).reduce((a, x) => a + x.imported, 0)
-    toast(`Imported ${n} from ${b.dataset.plat}`); await loadSync()
+    toast(`Imported ${n} from ${b.dataset.plat}`)
   }))
 }
-
-// ---- dialog ----
-const dlg = el('#dlg'), form = el('#dlgForm')
-function openNew() {
-  editingId = null
-  el('#dlgTitle').textContent = 'New memory'
-  form.reset(); form.kind.value = 'semantic'; form.importance.value = '0.5'; form.pinned.checked = false
-  dlg.showModal()
-}
-async function openEdit(id) {
-  const m = await api(`/memories/${encodeURIComponent(id)}`)
-  if (m.error) { toast('Not found'); return }
-  editingId = id
-  el('#dlgTitle').textContent = 'Edit memory'
-  form.kind.value = m.kind; form.title.value = m.title; form.content.value = m.content
-  form.tags.value = m.tags.join(', '); form.importance.value = String(m.importance)
-  form.links.value = (m.links || []).join(', '); form.pinned.checked = !!m.pinned
-  dlg.showModal()
-}
-el('#dlgCancel').addEventListener('click', () => dlg.close())
-form.addEventListener('submit', async (e) => {
-  e.preventDefault()
-  const body = {
-    kind: form.kind.value, title: form.title.value, content: form.content.value,
-    tags: form.tags.value.split(',').map(t => t.trim()).filter(Boolean),
-    importance: Number(form.importance.value),
-    links: form.links.value.split(',').map(t => t.trim()).filter(Boolean),
-    pinned: form.pinned.checked,
-  }
-  if (editingId) await api(`/memories/${encodeURIComponent(editingId)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-  else await api('/memories', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-  dlg.close(); toast(editingId ? 'Saved' : 'Created'); await refresh()
-})
+async function loadSync() { await loadPlatforms() }
 
 // ---- tabs / toolbar ----
 function setView(v) {
@@ -221,7 +165,6 @@ function setView(v) {
 el('#tabBoard').addEventListener('click', () => setView('board'))
 el('#tabGraph').addEventListener('click', () => setView('graph'))
 el('#tabSync').addEventListener('click', () => setView('sync'))
-el('#newBtn').addEventListener('click', openNew)
 el('#refreshBtn').addEventListener('click', () => { refresh().then(() => toast('Refreshed')) })
 el('#pinnedOnly').addEventListener('change', loadBoard)
 let searchTimer
@@ -232,10 +175,8 @@ el('#importBtn').addEventListener('click', async () => {
   const raw = el('#importPath').value.trim(); if (!raw) return
   const files = raw.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
   const res = await api('/import', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ files }) })
-  toast(`Imported ${(res || []).reduce((n, r) => n + r.imported, 0)} sections`); el('#importPath').value = ''; await loadSync()
+  toast(`Imported ${(res || []).reduce((n, r) => n + r.imported, 0)} sections`); el('#importPath').value = ''
 })
-el('#pullAllBtn').addEventListener('click', async () => { const r = await api('/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ direction: 'pull' }) }); toast(`Pulled ${(r || []).length} files`); await loadSync() })
-el('#pushAllBtn').addEventListener('click', async () => { const r = await api('/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ direction: 'push' }) }); toast(`Pushed ${(r || []).length} files`); await loadSync() })
 window.addEventListener('resize', () => { if (view === 'graph') loadGraph() })
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
