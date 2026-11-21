@@ -26,7 +26,7 @@ export interface SyncResult {
 
 /** List the distinct source files currently backing memory records. */
 export async function trackedFiles(service: MemoryService): Promise<string[]> {
-  const all = await service.list({ limit: Number.POSITIVE_INFINITY, includeExpired: true })
+  const all = await service.allRecords()
   const set = new Set<string>()
   for (const r of all) {
     if (r.source === undefined) continue
@@ -91,6 +91,6 @@ export async function reconcileFile(service: MemoryService, file: string, lastSy
 
 /** All records whose source begins with `<file>#`. */
 async function recordsForFile(service: MemoryService, file: string): Promise<MemoryRecord[]> {
-  const all = await service.list({ limit: Number.POSITIVE_INFINITY, includeExpired: true })
+  const all = await service.allRecords()
   return all.filter(r => r.source !== undefined && r.source.startsWith(`${file}#`))
 }

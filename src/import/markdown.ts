@@ -77,7 +77,7 @@ function inferKind(section: MdSection): MemoryKind {
 export async function importFile(service: MemoryService, file: string, kind?: MemoryKind): Promise<ImportResult> {
   const markdown = await readFile(file, 'utf8')
   const sections = parseMarkdownSections(markdown)
-  const existing = await service.list({ source: undefined, limit: Number.POSITIVE_INFINITY })
+  const existing = await service.allRecords()
   const bySource = new Map<string, MemoryRecord>()
   for (const r of existing) if (r.source !== undefined) bySource.set(r.source, r)
 

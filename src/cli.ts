@@ -10,6 +10,9 @@
  *   memorydex import <files..># one-click import AGENTS.md/CLAUDE.md
  *   memorydex sync [--push] [file]  # two-way sync
  *   memorydex stats
+  memorydex export [file.json]      Export all memories to a JSON bundle
+  memorydex restore <file.json> [--replace]  Restore a bundle (merge|replace)
+  memorydex reembed                 Recompute embeddings (after switching models)
  * Common flags: --db <sqlite|pg|mysql> --db-path <path> --db-url <url> --config <file>
  */
 import { mkdir } from 'node:fs/promises'
@@ -25,6 +28,8 @@ import { serveMcpStdio } from './mcp/server.ts'
 import { startHttpServer } from './http/server.ts'
 import { pullFile, pushFile, reconcileFile } from './sync/files.ts'
 import { watchFiles } from './sync/watch.ts'
+import { exportBundle, importBundle, reembedAll, type MemoryBundle } from './backup.ts'
+import { readFile, writeFile } from 'node:fs/promises'
 
 /** Parse argv into { cmd, positionals, flags }. */
 function parseArgs(argv: string[]): { cmd: string; pos: string[]; flags: Record<string, string | boolean> } {
@@ -78,6 +83,9 @@ Usage:
   memorydex sync [--push|--pull] [file]
   memorydex watch [file...]         Auto-sync file changes into memory
   memorydex stats
+  memorydex export [file.json]      Export all memories to a JSON bundle
+  memorydex restore <file.json> [--replace]  Restore a bundle (merge|replace)
+  memorydex reembed                 Recompute embeddings (after switching models)
 
 Flags: --db <sqlite|pg|mysql>  --db-path <sqlite file>  --db-url <pg/mysql url>  --config <file>
        --embed-url <url>  --embed-model <name>  --embed-key <key>  --embed-off  --embed-hashing
@@ -138,11 +146,26 @@ if (cmd === 'mcp') {
       if (pos[0] !== undefined) {
         process.stdout.write(JSON.stringify(dir === 'push' ? await pushFile(service, pos[0]) : await pullFile(service, pos[0]), null, 2) + '\n')
       } else {
-        const files = await service.list({ limit: Number.POSITIVE_INFINITY }).then(rs => [...new Set(rs.map(r => r.source?.split('#')[0]).filter((x): x is string => !!x))])
+        const files = [...new Set((await service.allRecords()).map(r => r.source?.split('#')[0]).filter((x): x is string => !!x))]
         for (const f of files) process.stdout.write(JSON.stringify(dir === 'push' ? await pushFile(service, f) : await reconcileFile(service, f).then(r => r.result)) + '\n')
       }
     } else if (cmd === 'stats') {
       process.stdout.write(JSON.stringify(await service.stats(), null, 2) + '\n')
+    } else if (cmd === 'export') {
+      const out = pos[0] ?? 'memorydex-backup.json'
+      const bundle = await exportBundle(service)
+      await writeFile(out, JSON.stringify(bundle, null, 2), 'utf8')
+      process.stdout.write(`exported ${bundle.count} records -> ${out}\n`)
+    } else if (cmd === 'restore') {
+      const file = pos[0]
+      if (file === undefined) { process.stderr.write('restore needs a bundle file\n'); process.exit(1) }
+      const bundle = JSON.parse(await readFile(file, 'utf8')) as MemoryBundle
+      const mode = flags.replace === true ? 'replace' : 'merge'
+      const r = await importBundle(service, bundle, mode)
+      process.stdout.write(`restored: inserted ${r.inserted}, skipped ${r.skipped} (mode ${mode})\n`)
+    } else if (cmd === 'reembed') {
+      const n = await reembedAll(service)
+      process.stdout.write(`re-embedded ${n} records\n`)
     } else {
       printHelp()
     }

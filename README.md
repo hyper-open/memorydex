@@ -128,6 +128,25 @@ memorydex --db mysql --db-url 'mysql://user:pass@host:3306/db' stats
 
 For `pg`/`mysql`: install the driver (`pg` / `mysql2`) and provide `db.url` (e.g. `postgres://user:pass@host/db`). The SQL adapter interface is `MemoryStore` (`src/db/adapter.ts`) — any backend implementing it works.
 
+## Scope & limits (lightweight by design)
+
+memorydex targets **personal / single-machine / small-team** use: one workspace's agent memory, local AGENTS.md ↔ memory upkeep, on the order of a few hundred to a few thousand records. It is intentionally **not** a multi-tenant or high-concurrency service:
+
+- Retrieval scores in process; list/search pages are capped (`DEFAULT_LIMIT` 100, `MAX_LIMIT` 1000). For very large corpora, add DB-side indexes rather than raising the cap.
+- The HTTP UI binds `127.0.0.1` by default and has **no auth** — do not expose it to untrusted networks.
+- Storage is a single SQLite file by default — easy to copy/back up; see below.
+
+### Backup / portability
+
+```bash
+memorydex export ~/memorydex-backup.json      # whole store -> JSON bundle
+memorydex restore ~/memorydex-backup.json      # merge by id (safe, no duplicates)
+memorydex restore ~/memorydex-backup.json --replace   # wipe then load
+memorydex reembed                              # recompute embeddings after switching models
+```
+
+A SQLite deployment can also just copy the `.db` file (WAL is enabled).
+
 ## REST API
 
 | Method & path | Purpose |

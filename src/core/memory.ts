@@ -20,6 +20,17 @@ import {
   type MemoryUpdateInput,
 } from './types.ts'
 
+/** Default page size for list/search when the caller gives no limit. */
+export const DEFAULT_LIMIT = 100
+/** Hard cap on any single list/search page (protects memory under large stores). */
+export const MAX_LIMIT = 1000
+
+/** Clamp a caller limit into [1, MAX_LIMIT], defaulting when undefined. */
+function clampLimit(limit: number | undefined): number {
+  if (limit === undefined || Number.isNaN(limit)) return DEFAULT_LIMIT
+  return Math.max(1, Math.min(MAX_LIMIT, Math.floor(limit)))
+}
+
 /** Mint a short, sortable, collision-safe memory id. */
 function mintId(): string {
   const t = Date.now().toString(36)
@@ -96,6 +107,16 @@ export class MemoryService {
     return record
   }
 
+  /** Persist an exact record as-is (preserving id) — used by bundle restore/migration. */
+  async restoreRecord(record: MemoryRecord): Promise<void> {
+    await this.store.put(record)
+  }
+
+  /** All records, unfiltered and unpaged (internal: import/sync/stats). */
+  async allRecords(now = Date.now(), includeExpired = true): Promise<MemoryRecord[]> {
+    return (await this.store.all()).filter(r => includeExpired || !isExpired(r, now))
+  }
+
   /** Get one record by id. */
   async get(id: string): Promise<MemoryRecord | undefined> {
     return this.store.get(id)
@@ -151,7 +172,7 @@ export class MemoryService {
     let out = (await this.store.all()).filter(r => matchesFilter(r, filter, now))
     out.sort((a, b) => b.updatedAt - a.updatedAt)
     const offset = filter.offset ?? 0
-    const limit = filter.limit ?? Number.POSITIVE_INFINITY
+    const limit = clampLimit(filter.limit)
     return out.slice(offset, offset + limit)
   }
 
@@ -189,7 +210,7 @@ export class MemoryService {
     })
     scored.sort((a, b) => b.score - a.score)
     const offset = filter.offset ?? 0
-    const limit = filter.limit ?? Number.POSITIVE_INFINITY
+    const limit = clampLimit(filter.limit)
     return scored.slice(offset, offset + limit)
   }
 
