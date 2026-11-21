@@ -1,7 +1,10 @@
 {
+  "mode": "local",
   "db": { "kind": "sqlite", "path": "~/.memorydex/memory.db" },
+  "remote": { "kind": "qdrant", "url": "http://127.0.0.1:6333", "collection": "memorydex", "dim": 1024, "apiKey": "" },
   "port": 7567,
   "host": "127.0.0.1",
+  "dedupe": true,
   "embedding": {
     "enabled": true,
     "kind": "http",

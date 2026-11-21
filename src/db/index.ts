@@ -10,6 +10,8 @@ import { SqliteStore } from './sqlite.ts'
 import { PgStore } from './pg.ts'
 import { MysqlStore } from './mysql.ts'
 import type { MemoryStore } from './adapter.ts'
+import { openVectorStore } from './vector/index.ts'
+import type { VectorStoreConfig } from './vector/config.ts'
 
 /** Configuration for an SQL-family backend. */
 export interface DbConfig {
@@ -55,4 +57,22 @@ export async function openStore(config: DbConfig = DEFAULT_DB): Promise<MemorySt
   }
   await store.init()
   return store
+}
+
+/** Storage mode for {@link openByMode}. */
+export type StorageMode = 'local' | 'remote' | 'cloud'
+
+/**
+ * Open the store for a storage mode.
+ * - local  -> the DB backend from `db`.
+ * - remote -> an external vector store from `remote`.
+ * - cloud  -> not configured (throws; platform mode is future work).
+ */
+export async function openByMode(mode: StorageMode, db: DbConfig, remote: VectorStoreConfig): Promise<MemoryStore> {
+  switch (mode) {
+    case 'local': return openStore(db)
+    case 'remote': return openVectorStore(remote)
+    case 'cloud': throw new Error('cloud mode (platform API) is not configured in this build')
+    default: { const ex: never = mode; throw new Error(`Unknown mode: ${String(ex)}`) }
+  }
 }

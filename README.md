@@ -79,6 +79,24 @@ Two-way sync:
 - Programmatic: `reconcileFile()` decides direction from a content hash.
 - **Auto-sync**: `memorydex watch [files…]` (or `watchFiles()`) watches tracked files and pulls changes into memory automatically (debounced).
 
+## Operating modes: local / remote / cloud
+
+Two **independent** dimensions — pick a storage mode, and separately decide whether to use vector retrieval (they compose freely; mode does not force embeddings):
+
+```jsonc
+{ "mode": "local", "db": { "kind": "sqlite" }, "embedding": { "enabled": true } }
+```
+
+| Mode | Storage | Use when |
+|---|---|---|
+| **local** | SQLite (bundled) | single machine, zero infra (default) |
+| **remote** | external **vector store** (Qdrant) via `remote` config | large corpora / shared ANN index; needs a running Qdrant |
+| **cloud** | platform-hosted API (register + API key) | *not implemented in this build — throws from `openByMode('cloud', …)`* |
+
+- `mode` chooses **where** memories live; `embedding.enabled` + model config choose **whether/how** to do vector search. Any combination is valid: `local`+vector, `local`+lexical, `remote`+vector, `remote`+keyword-over-vector-payload, etc.
+- **remote**: `{"remote": {"kind":"qdrant","url":"http://127.0.0.1:6333","collection":"memorydex","dim":1024,"apiKey":""}}`. Requires Qdrant; the collection auto-creates on first use. CLI: `--mode remote --vector-url … --vector-key … --vector-collection …`. Verified end-to-end against a live Qdrant (writes, scroll, vector search).
+- `cloud` mode is a placeholder for a future platform API (registration + key); selecting it raises a clear "not configured" error today.
+
 ## Configuration
 
 Defaults to SQLite at `~/.memorydex/memory.db`, port `7567`. Override via `memorydex.config.json` or env:

@@ -9,11 +9,19 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { DbConfig } from './db/index.ts'
 import type { EmbeddingConfig } from './embedder-config.ts'
+import type { VectorStoreConfig } from './db/vector/config.ts'
+
+/** Operating mode: where memories are stored. */
+export type MemorydexMode = 'local' | 'remote' | 'cloud'
 
 /** Full application config. */
 export interface MemorydexConfig {
-  /** Database backend selection. */
+  /** Storage mode: local (SQLite) / remote (external vector store) / cloud (platform API). */
+  readonly mode: MemorydexMode
+  /** Local-mode database backend selection. */
   readonly db: DbConfig
+  /** Remote-mode vector store config (Qdrant). */
+  readonly remote: VectorStoreConfig
   /** HTTP server port (for `serve`/`ui`). */
   readonly port: number
   /** HTTP bind host. */
@@ -27,7 +35,9 @@ export interface MemorydexConfig {
 /** Default config (SQLite in the user's home). */
 export function defaultConfig(): MemorydexConfig {
   return {
+    mode: 'local',
     db: { kind: 'sqlite', path: join(homedir(), '.memorydex', 'memory.db') },
+    remote: { kind: 'qdrant', url: 'http://127.0.0.1:6333', collection: 'memorydex' },
     port: 7567,
     host: '127.0.0.1',
     embedding: { enabled: true, kind: 'hashing', hashingDim: 256 },
@@ -62,8 +72,17 @@ export function loadConfig(explicitPath?: string): MemorydexConfig {
   if (process.env.MEMORYDEX_EMBED_KEY !== undefined) (embEnv as { apiKey?: string }).apiKey = process.env.MEMORYDEX_EMBED_KEY
   if (process.env.MEMORYDEX_EMBED_OFF === '1') (embEnv as { enabled?: boolean }).enabled = false
   const embedding: EmbeddingConfig = { ...base.embedding, ...file.embedding, ...embEnv }
+  const modeEnv = process.env.MEMORYDEX_MODE
+  const mode: MemorydexMode = (modeEnv === 'local' || modeEnv === 'remote' || modeEnv === 'cloud') ? modeEnv : (file.mode ?? base.mode)
+  const remoteEnv: Partial<VectorStoreConfig> = {}
+  if (process.env.MEMORYDEX_VECTOR_URL !== undefined) (remoteEnv as { url?: string }).url = process.env.MEMORYDEX_VECTOR_URL
+  if (process.env.MEMORYDEX_VECTOR_KEY !== undefined) (remoteEnv as { apiKey?: string }).apiKey = process.env.MEMORYDEX_VECTOR_KEY
+  if (process.env.MEMORYDEX_VECTOR_COLLECTION !== undefined) (remoteEnv as { collection?: string }).collection = process.env.MEMORYDEX_VECTOR_COLLECTION
+  const remote: VectorStoreConfig = { ...base.remote, ...file.remote, ...remoteEnv }
   return {
+    mode,
     db,
+    remote,
     port: file.port ?? (process.env.MEMORYDEX_PORT === undefined ? base.port : Number(process.env.MEMORYDEX_PORT)),
     host: file.host ?? base.host,
     embedding,

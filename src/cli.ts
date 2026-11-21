@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { MemoryService } from './core/memory.ts'
 import { MEMORY_KINDS, type MemoryKind } from './core/types.ts'
 import { loadConfig } from './config.ts'
-import { openStore } from './db/index.ts'
+import { openStore, openByMode } from './db/index.ts'
 import { resolveEmbedder } from './embedder-config.ts'
 import { importFiles } from './import/markdown.ts'
 import { serveMcpStdio } from './mcp/server.ts'
@@ -102,6 +102,7 @@ Usage:
 Flags: --db <sqlite|pg|mysql>  --db-path <sqlite file>  --db-url <pg/mysql url>  --config <file>
        --embed-url <url>  --embed-model <name>  --embed-key <key>  --embed-off  --embed-hashing
        --no-dedupe
+       --mode <local|remote|cloud>  --vector-url <url>  --vector-key <key>  --vector-collection <name>
 Kinds: ${MEMORY_KINDS.join(', ')}
 `)
 }
