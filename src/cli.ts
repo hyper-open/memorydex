@@ -33,6 +33,7 @@ import { watchFiles } from './sync/watch.ts'
 import { exportBundle, importBundle, reembedAll, type MemoryBundle } from './backup.ts'
 import { defaultAdapters } from './adapters/index.ts'
 import { importPlatform } from './adapters/index.ts'
+import { watchPlatforms } from './adapters/watch-platforms.ts'
 import { homedir } from 'node:os'
 import { readFile, writeFile } from 'node:fs/promises'
 
@@ -88,6 +89,7 @@ Usage:
   memorydex import <file...>          Import AGENTS.md/CLAUDE.md/any .md
   memorydex sync [--push|--pull] [file]
   memorydex watch [file...]         Auto-sync file changes into memory
+  memorydex watch-platforms         Auto-import changed platform memory files (Claude/Codebuddy/…)
   memorydex stats
   memorydex export [file.json]      Export all memories to a JSON bundle
   memorydex restore <file.json> [--replace]  Restore a bundle (merge|replace)
@@ -127,6 +129,19 @@ if (cmd === 'mcp') {
     const stop = (): void => { handle.close(); void close().finally(() => resolve()) }
     process.once('SIGINT', stop)
     process.once('SIGTERM', stop)
+  })
+} else if (cmd === 'watch-platforms') {
+  const { service, close } = await openService(flags)
+  const reg = defaultAdapters(homedir())
+  const handle = watchPlatforms(service, reg, {
+    intervalMs: typeof flags.interval === 'string' ? Number(flags.interval) : undefined,
+    onChange: (platform, file, imported, updated) => process.stdout.write(`[${platform}] ${file}: +${imported} ~${updated}\n`),
+    onError: (platform, file, error) => process.stderr.write(`[${platform}] watch error ${file}: ${String(error)}\n`),
+  })
+  process.stdout.write('watching platform memory files; Ctrl-C to stop\n')
+  await new Promise<void>(resolve => {
+    const stop = (): void => { handle.close(); void close().finally(() => resolve()) }
+    process.once('SIGINT', stop); process.once('SIGTERM', stop)
   })
 } else {
   const { service, close } = await openService(flags)

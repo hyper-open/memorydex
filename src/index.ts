@@ -17,6 +17,7 @@ export { pullFile, pushFile, reconcileFile, trackedFiles, type SyncResult } from
 export { watchFiles, type WatchHandle, type WatchOptions } from './sync/watch.ts'
 export { buildMcpServer, serveMcpStdio } from './mcp/server.ts'
 export { startHttpServer } from './http/server.ts'
+export { watchPlatforms, type PlatformWatchOptions, type PlatformWatchHandle } from './adapters/watch-platforms.ts'
 export { defaultAdapters, importPlatform, importPlatformLocation, type PlatformAdapter, type PlatformSection, type AdapterRegistry } from './adapters/index.ts'
 export { CodebuddyAdapter, WorkbuddyAdapter } from './adapters/codebuddy-workbuddy.ts'
 export { exportBundle, importBundle, reembedAll, BUNDLE_VERSION, type MemoryBundle } from './backup.ts'

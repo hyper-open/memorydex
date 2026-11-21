@@ -128,6 +128,10 @@ memorydex --db mysql --db-url 'mysql://user:pass@host:3306/db' stats
 
 For `pg`/`mysql`: install the driver (`pg` / `mysql2`) and provide `db.url` (e.g. `postgres://user:pass@host/db`). The SQL adapter interface is `MemoryStore` (`src/db/adapter.ts`) — any backend implementing it works.
 
+## Auto-import as platforms change
+
+`memorydex watch-platforms` polls each adapter's discovered files and re-imports any that changed (content-hash based, debounced, idempotent thanks to write dedupe). Good for keeping the store in sync with Claude/Codex/Codebuddy/WorkBuddy files without manual imports. Programmatic: `watchPlatforms(service, registry, { intervalMs, onChange })`.
+
 ## Web UI: browse, search, delete (read-only)
 
 The web UI is **read-only for memory content**: it lists, searches, filters, shows the graph, deletes records, and offers **platform import**. Creating or editing a memory is done through the **SDK / HTTP API / MCP tools**, not the page — so a deployed UI can be handed to viewers without exposing content edits.
