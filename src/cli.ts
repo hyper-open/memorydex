@@ -19,6 +19,7 @@ import { MemoryService } from './core/memory.ts'
 import { MEMORY_KINDS, type MemoryKind } from './core/types.ts'
 import { loadConfig } from './config.ts'
 import { openStore } from './db/index.ts'
+import { resolveEmbedder } from './embedder-config.ts'
 import { importFiles } from './import/markdown.ts'
 import { serveMcpStdio } from './mcp/server.ts'
 import { startHttpServer } from './http/server.ts'
@@ -50,8 +51,17 @@ async function openService(flags: Record<string, string | boolean>): Promise<{ s
   if (typeof flags['db-path'] === 'string') (db as { path: string }).path = flags['db-path']
   if (typeof flags['db-url'] === 'string') (db as { url: string }).url = flags['db-url']
   if (db.kind === 'sqlite' && db.path !== ':memory:') await mkdir(dirname(db.path!), { recursive: true })
+  // Embedding config: env/config defaults, with CLI overrides.
+  const emb = { ...config.embedding }
+  if (flags['embed-off'] === true) (emb as { enabled?: boolean }).enabled = false
+  if (typeof flags['embed-url'] === 'string') { (emb as { url?: string }).url = flags['embed-url']; (emb as { kind?: string }).kind = 'http' }
+  if (typeof flags['embed-model'] === 'string') (emb as { model?: string }).model = flags['embed-model']
+  if (typeof flags['embed-key'] === 'string') (emb as { apiKey?: string }).apiKey = flags['embed-key']
+  if (flags['embed-hashing'] === true) (emb as { kind?: string }).kind = 'hashing'
+  const resolved = await resolveEmbedder(emb)
+  if (resolved.note !== undefined) process.stderr.write(`memorydex: ${resolved.note}\n`)
   const store = await openStore(db)
-  const service = new MemoryService(store)
+  const service = new MemoryService(store, resolved.embedder ?? null)
   return { service, close: () => store.close() }
 }
 
@@ -70,6 +80,7 @@ Usage:
   memorydex stats
 
 Flags: --db <sqlite|pg|mysql>  --db-path <sqlite file>  --db-url <pg/mysql url>  --config <file>
+       --embed-url <url>  --embed-model <name>  --embed-key <key>  --embed-off  --embed-hashing
 Kinds: ${MEMORY_KINDS.join(', ')}
 `)
 }

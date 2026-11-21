@@ -24,7 +24,8 @@
     "lib",
     "web",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "memorydex.config.example.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

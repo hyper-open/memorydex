@@ -60,15 +60,21 @@ export class MemoryService {
   }
 
   /** Compute an embedding for a record's text, or undefined when disabled. */
-  private embedText(title: string, content: string, tags: readonly string[]): number[] | undefined {
+  private async embedText(title: string, content: string, tags: readonly string[]): Promise<number[] | undefined> {
     if (this.embedder === undefined) return undefined
-    return this.embedder.embed(`${title}\n${content}\n${tags.join(' ')}`)
+    try {
+      return await this.embedder.embed(`${title}\n${content}\n${tags.join(' ')}`)
+    } catch {
+      // Degrade gracefully: a dead embedding server must not fail writes.
+      return undefined
+    }
   }
 
   /** Create and persist a new memory record. */
   async create(input: MemoryCreateInput, now = Date.now()): Promise<MemoryRecord> {
     if (!MEMORY_KINDS.includes(input.kind)) throw new Error(`Invalid memory kind: ${input.kind}`)
     if (input.title.trim() === '') throw new Error('Memory title must not be empty.')
+    const emb = this.embedder === undefined ? undefined : await this.embedText(input.title, input.content, input.tags ?? [])
     const record: MemoryRecord = {
       id: mintId(),
       kind: input.kind,
@@ -84,7 +90,7 @@ export class MemoryService {
       ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
       ...(input.links === undefined ? {} : { links: dedupeTags(input.links) }),
       ...(input.pinned === true ? { pinned: true } : {}),
-      ...(this.embedder === undefined ? {} : { embedding: this.embedText(input.title, input.content, input.tags ?? []) }),
+      ...(emb === undefined ? {} : { embedding: emb }),
     }
     await this.store.put(record)
     return record
@@ -117,9 +123,11 @@ export class MemoryService {
       updatedAt: now,
     }
     // Re-embed when title/content/tags changed.
-    const withEmb: MemoryRecord = (this.embedder === undefined || (patch.title === undefined && patch.content === undefined && patch.tags === undefined))
-      ? next
-      : { ...next, embedding: this.embedText(next.title, next.content, next.tags) }
+    let withEmb: MemoryRecord = next
+    if (this.embedder !== undefined && (patch.title !== undefined || patch.content !== undefined || patch.tags !== undefined)) {
+      const emb = await this.embedText(next.title, next.content, next.tags)
+      if (emb !== undefined) withEmb = { ...next, embedding: emb }
+    }
     // expiresAt: null explicitly clears; number sets; undefined leaves unchanged.
     const withExpiry: MemoryRecord = patch.expiresAt === undefined
       ? withEmb
@@ -155,7 +163,7 @@ export class MemoryService {
   async search(query: string, filter: MemoryFilter = {}, now = Date.now()): Promise<MemorySearchHit[]> {
     const q = query.trim().toLowerCase()
     const qTerms = terms(q)
-    const qVec = this.embedder !== undefined && q !== '' ? this.embedder.embed(query) : undefined
+    const qVec = this.embedder !== undefined && q !== '' ? await this.embedText(query, '', []) : undefined
     const candidates = (await this.store.all()).filter(r => matchesFilter(r, filter, now))
     const scored: MemorySearchHit[] = candidates.map(record => {
       const hay = `${record.title} ${record.content} ${record.tags.join(' ')}`.toLowerCase()

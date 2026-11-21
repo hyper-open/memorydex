@@ -7,12 +7,12 @@
  * real model (OpenAI, local) by implementing {@link Embedder} and passing it in.
  */
 
-/** A text embedder. */
+/** A text embedder (async so remote model servers fit the same interface). */
 export interface Embedder {
   /** Vector dimension produced by {@link embed}. */
   readonly dim: number
   /** Embed a single text into a unit vector. */
-  embed(text: string): number[]
+  embed(text: string): Promise<number[]>
 }
 
 /** Deterministic signed-hashing bag-of-ngrams embedder. */
@@ -22,7 +22,7 @@ export class HashingEmbedder implements Embedder {
    */
   constructor(readonly dim = 256) {}
 
-  embed(text: string): number[] {
+  async embed(text: string): Promise<number[]> {
     const vec = new Array<number>(this.dim).fill(0)
     const toks = tokenize(text)
     for (const tok of toks) {

@@ -91,7 +91,31 @@ Defaults to SQLite at `~/.memorydex/memory.db`, port `7567`. Override via `memor
 }
 ```
 
-Env: `MEMORYDEX_DB` (`sqlite|pg|mysql`), `MEMORYDEX_DB_PATH`, `MEMORYDEX_DB_URL`, `MEMORYDEX_PORT`.
+Env: `MEMORYDEX_DB` (`sqlite|pg|mysql`), `MEMORYDEX_DB_PATH`, `MEMORYDEX_DB_URL`, `MEMORYDEX_PORT`, `MEMORYDEX_EMBED_URL`, `MEMORYDEX_EMBED_MODEL`, `MEMORYDEX_EMBED_KEY`, `MEMORYDEX_EMBED_OFF=1`.
+
+### Embeddings (vector retrieval) — with graceful degradation
+
+Vector retrieval is a **switch + model config**. Three modes via `embedding.kind`:
+
+- `http` — an OpenAI-compatible embeddings server (e.g. a local **bge-m3** at `http://127.0.0.1:11434/v1/embeddings`). Probed at startup; **if unreachable it degrades to `hashing`** (or off, if `fallbackToHashing:false`).
+- `hashing` — the built-in zero-dependency embedder (offline, always works).
+- `off` / `enabled:false` — no embeddings; purely lexical.
+
+```jsonc
+{
+  "db": { "kind": "sqlite", "path": "~/.memorydex/memory.db" },
+  "embedding": {
+    "enabled": true,
+    "kind": "http",
+    "url": "http://127.0.0.1:11434/v1/embeddings",
+    "model": "bge-m3",
+    "apiKey": "…",              // Bearer token if the server requires one
+    "fallbackToHashing": true
+  }
+}
+```
+
+CLI overrides: `--embed-url <url> --embed-model <name> --embed-key <key> --embed-hashing --embed-off`. When the server is down you'll see `memorydex: degraded: … unreachable; using hashing` on stderr and retrieval keeps working. Plug any model by implementing `Embedder`.
 
 CLI flags: `--db <sqlite|pg|mysql>`, `--db-path <sqlite file>`, `--db-url <pg/mysql url>`.
 

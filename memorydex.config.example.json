@@ -1,0 +1,13 @@
+{
+  "db": { "kind": "sqlite", "path": "~/.memorydex/memory.db" },
+  "port": 7567,
+  "host": "127.0.0.1",
+  "embedding": {
+    "enabled": true,
+    "kind": "http",
+    "url": "http://127.0.0.1:11434/v1/embeddings",
+    "model": "bge-m3",
+    "apiKey": "YOUR_EMBED_KEY",
+    "fallbackToHashing": true
+  }
+}

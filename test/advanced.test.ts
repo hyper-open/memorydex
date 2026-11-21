@@ -14,11 +14,11 @@ async function svc(): Promise<MemoryService> {
   const s = new SqliteStore(':memory:'); await s.init(); return new MemoryService(s)
 }
 
-test('hashing embedder produces unit vectors and cosine is sane', () => {
+test('hashing embedder produces unit vectors and cosine is sane', async () => {
   const e = new HashingEmbedder(128)
-  const a = e.embed('deploy the app to production')
-  const b = e.embed('deploy the app to production')
-  const c = e.embed('completely unrelated banana')
+  const a = await e.embed('deploy the app to production')
+  const b = await e.embed('deploy the app to production')
+  const c = await e.embed('completely unrelated banana')
   const norm = Math.sqrt(a.reduce((s, x) => s + x * x, 0))
   assert.ok(Math.abs(norm - 1) < 1e-9)
   assert.ok(cosine(a, b) > 0.99)      // identical
