@@ -1,0 +1,18 @@
+{
+  "name": "dsh-memorydex",
+  "version": "0.1.0",
+  "description": "DSH integration for memorydex: automatic memory recall (inject relevant memories into the prompt) and automatic sediment (store turn summaries). Host-only plugin.",
+  "type": "module",
+  "main": "lib/index.js",
+  "files": ["lib", "cordis.patch.yml"],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=0.2.0-0 <0.3.0"
+  },
+  "dependencies": {
+    "memorydex": "^0.1.0"
+  },
+  "license": "MIT"
+}

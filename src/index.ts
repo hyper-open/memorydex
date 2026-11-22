@@ -7,6 +7,7 @@
 export * from './core/types.ts'
 export { MemoryService } from './core/memory.ts'
 export { HashingEmbedder, cosine, type Embedder } from './core/embedder.ts'
+export { resolveEmbedder, type EmbeddingConfig, type ResolvedEmbedder } from './embedder-config.ts'
 export { openByMode, type StorageMode } from './db/index.ts'
 export { openVectorStore, QdrantStore, PgVectorStore, type VectorStoreConfig } from './db/vector/index.ts'
 export { openStore, DEFAULT_DB, type DbConfig } from './db/index.ts'

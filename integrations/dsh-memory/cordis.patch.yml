@@ -1,0 +1,4 @@
+# dsh-memorydex bundle patch: inserts the memorydex integration row into the profile.
+- insert:
+    - id: dsh-memorydex
+      name: dsh-memorydex
