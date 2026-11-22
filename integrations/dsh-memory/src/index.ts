@@ -82,11 +82,30 @@ function lastUserText(messages: readonly unknown[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i] as { role?: string }
     if (m.role === undefined || m.role === 'user') {
+      if (!isRealUserMessage(messages[i])) continue
       const t = messageText(messages[i])
       if (t !== '') return t
     }
   }
   return ''
+}
+
+/** Texts DSH injects as runtime/context that must not be treated as user input. */
+const NOISE_PREFIX = /^(Time sampled while preparing|Current runtime context|Browser time zone for this request)/i
+
+/** Source kinds that are system/automation injections, never real user input. */
+const NON_USER_KINDS = new Set(['schedule', 'agent-instructions', 'session-reference', 'system-prompt', 'memorydex'])
+
+/** Is this message a genuine user turn (not injected runtime context / recall / automation)? */
+function isRealUserMessage(m: unknown): boolean {
+  const src = (m as { source?: { kind?: string; form?: string } }).source
+  if (src?.form === 'recall' || src?.form === 'snapshot' || src?.form === 'instructions') return false
+  // Only genuine user-sourced messages count; schedule/agent/context injections do not.
+  if (src?.kind !== undefined && src.kind !== 'user') return false
+  const t = messageText(m).trim()
+  if (t === '' || NOISE_PREFIX.test(t)) return false
+  if (/^\[SCHEDULE REMINDER BATCH\]/i.test(t) || /^This is a scheduled message from the user/i.test(t)) return false
+  return true
 }
 
 /** Trim + collapse whitespace, cap length. */
@@ -155,8 +174,10 @@ export function apply(ctx: Context, config: Config = {}): void {
     const lastUser = new WeakMap<object, string>()
     ctx.on('session/event', (session: object, event: { type?: string; data?: unknown }) => {
       if (event.type === 'user/message') {
-        const t = messageText(event.data)
-        if (t !== '') lastUser.set(session, t)
+        if (isRealUserMessage(event.data)) {
+          const t = messageText(event.data)
+          if (t !== '') lastUser.set(session, t)
+        }
         return
       }
       if (event.type === 'turn/end') {
@@ -171,6 +192,7 @@ export function apply(ctx: Context, config: Config = {}): void {
             if (m.role === 'assistant') { assistant = messageText(derived[i]); if (assistant !== '') break }
           }
         } catch { /* ignore */ }
+        if (user.trim() === '') return
         const combined = `${user}\n→ ${assistant}`.trim()
         if (combined.length < sedimentCfg.minChars) return
         const title = tidy(user, 80) || 'session turn'
