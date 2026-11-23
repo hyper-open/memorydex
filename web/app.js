@@ -1,6 +1,6 @@
 // memorydex web UI — vanilla JS, no build step. Views: Board / Graph / Sync.
 const KINDS = ['working', 'episodic', 'semantic', 'procedural']
-const KIND_LABEL = { working: 'Working', episodic: 'Episodic', semantic: 'Semantic', procedural: 'Procedural' }
+const KIND_LABEL = { working: '工作记忆', episodic: '情景记忆', semantic: '语义记忆', procedural: '程序记忆' }
 const api = (path, opts) => fetch(`/api${path}`, opts).then(r => r.json())
 const el = (sel) => document.querySelector(sel)
 const board = el('#board')
@@ -12,7 +12,7 @@ function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); 
 
 async function loadState() {
   const { stats } = await api('/state')
-  el('#stats').innerHTML = KINDS.map(k => `<span><b>${stats.byKind[k] ?? 0}</b> ${KIND_LABEL[k]}</span>`).join('') + `<span><b>${stats.total}</b> total</span>`
+  el('#stats').innerHTML = KINDS.map(k => `<span><b>${stats.byKind[k] ?? 0}</b> ${KIND_LABEL[k]}</span>`).join('') + `<span><b>${stats.total}</b> 总计</span>`
 }
 
 function filterQs() {
@@ -35,9 +35,9 @@ async function loadBoard() {
   const tags = new Set(); const plats = new Set()
   for (const m of memories || []) { for (const t of m.tags) tags.add(t); if (m.metadata && m.metadata.platform) plats.add(m.metadata.platform) }
   const psel = el('#platformFilter'); const pcur = psel.value
-  psel.innerHTML = '<option value="">All platforms</option>' + [...plats].sort().map(p => `<option${p === pcur ? ' selected' : ''} value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('')
+  psel.innerHTML = '<option value="">全部平台</option>' + [...plats].sort().map(p => `<option${p === pcur ? ' selected' : ''} value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('')
   const sel = el('#tagFilter'); const cur = sel.value
-  sel.innerHTML = '<option value="">All tags</option>' + [...tags].sort().map(t => `<option${t === cur ? ' selected' : ''} value="${escapeAttr(t)}">${escapeHtml(t)}</option>`).join('')
+  sel.innerHTML = '<option value="">全部标签</option>' + [...tags].sort().map(t => `<option${t === cur ? ' selected' : ''} value="${escapeAttr(t)}">${escapeHtml(t)}</option>`).join('')
 }
 
 function renderBoard(memories) {
@@ -46,7 +46,7 @@ function renderBoard(memories) {
   board.innerHTML = KINDS.map(k => `
     <section class="col" data-kind="${k}">
       <h2><span class="dot ${k}"></span>${KIND_LABEL[k]}<span class="count">${byKind[k].length}</span></h2>
-      ${byKind[k].length === 0 ? '<div class="empty">No memories</div>' : byKind[k].map(cardHtml).join('')}
+      ${byKind[k].length === 0 ? '<div class="empty">暂无记忆</div>' : byKind[k].map(cardHtml).join('')}
     </section>`).join('')
   wireCards()
 }
@@ -55,19 +55,19 @@ function cardHtml(m) {
   const imp = typeof m.importance === 'number' ? m.importance : 0.5
   return `<article class="card ${m.kind} ${m.pinned ? 'pinned' : ''}" data-id="${escapeAttr(m.id)}">
     <div class="t">
-      ${m.pinned ? '<span class="pin" title="pinned">★</span>' : ''}
+      ${m.pinned ? '<span class="pin" title="已置顶">★</span>' : ''}
       <span>${escapeHtml(m.title)}</span>
     </div>
     <div class="c">${escapeHtml(m.content)}</div>
     <div class="meta">
-      <span class="impbar" title="importance ${imp.toFixed(2)}"><i style="width:${Math.round(imp * 100)}%"></i></span>
+      <span class="impbar" title="重要度 ${imp.toFixed(2)}"><i style="width:${Math.round(imp * 100)}%"></i></span>
       ${m.accessCount ? `<span class="src">· ${m.accessCount}×</span>` : ''}
       ${m.metadata && m.metadata.platform ? `<span class="tag" style="background:#26405a;color:#9fd0ff">${escapeHtml(m.metadata.platform)}</span>` : ''}
       ${m.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}
-      ${(m.links || []).map(id => `<button class="link" data-act="goto" data-target="${escapeAttr(id)}" title="linked memory">↔ ${escapeHtml(String(id).slice(-6))}</button>`).join('')}
+      ${(m.links || []).map(id => `<button class="link" data-act="goto" data-target="${escapeAttr(id)}" title="关联记忆">↔ ${escapeHtml(String(id).slice(-6))}</button>`).join('')}
       ${m.source ? `<span class="src">· ${escapeHtml(m.source.split('#')[0].split('/').pop())}${m.source.includes('#') ? '#' + escapeHtml(m.source.split('#')[1]) : ''}</span>` : ''}
       <div class="acts">
-        <button class="ghost sm" data-act="del">Delete</button>
+        <button class="ghost sm" data-act="del">删除</button>
       </div>
     </div>
   </article>`
@@ -78,8 +78,8 @@ function wireCards() {
     const id = card.dataset.id
     card.querySelector('.c')?.addEventListener('click', e => e.currentTarget.classList.toggle('open'))
     card.querySelector('[data-act="del"]')?.addEventListener('click', async () => {
-      if (!confirm('Delete this memory?')) return
-      await api(`/memories/${encodeURIComponent(id)}`, { method: 'DELETE' }); toast('Deleted'); await refresh()
+      if (!confirm('确定删除这条记忆？')) return
+      await api(`/memories/${encodeURIComponent(id)}`, { method: 'DELETE' }); toast('已删除'); await refresh()
     })
     card.querySelectorAll('[data-act="goto"]').forEach(b => b.addEventListener('click', () => showOnBoard(b.dataset.target)))
   })
@@ -144,11 +144,12 @@ async function loadAudit() {
   const rows = (data.events || []).map(e => {
     const t = new Date(e.time).toLocaleString()
     const color = { create: '#4fc08d', merge: '#e0a24a', update: '#5b9dd9', delete: '#d96d6d', import: '#9aa3b2' }[e.action] || '#9aa3b2'
-    return `<div class="filerow"><span style="flex:none;width:74px;color:${color};font-weight:600">${escapeHtml(e.action)}</span>
+    const actLabel = { create: '创建', update: '更新', merge: '合并', delete: '删除', import: '导入' }[e.action] || e.action
+    return `<div class="filerow"><span style="flex:none;width:74px;color:${color};font-weight:600">${escapeHtml(actLabel)}</span>
       <span class="src" style="flex:none;width:150px">${escapeHtml(t)}</span>
       <span style="flex:1;color:var(--muted)">${escapeHtml(e.summary || '')} <span class="src">· ${escapeHtml(String(e.recordId).slice(-8))}</span></span></div>`
   }).join('')
-  list.innerHTML = rows || '<span class="empty">No audit events yet.</span>'
+  list.innerHTML = rows || '<span class="empty">暂无审计记录</span>'
 }
 
 // ---- Platforms (import is the only write path in the UI) ----
@@ -158,12 +159,12 @@ async function loadPlatforms() {
   const list = el('#platformlist')
   const rows = Object.entries(data).map(([p, info]) =>
     `<div class="filerow"><span style="flex:1">${escapeHtml(p)} <span class="src">· ${info.files.length} file(s)${info.writable ? '' : ' · read-only'}</span></span>
-     <button class="ghost sm" data-plat="${escapeAttr(p)}" ${info.files.length === 0 ? 'disabled' : ''}>Import</button></div>`).join('')
-  list.innerHTML = rows || '<span class="empty">No platforms detected.</span>'
+     <button class="ghost sm" data-plat="${escapeAttr(p)}" ${info.files.length === 0 ? 'disabled' : ''}>导入</button></div>`).join('')
+  list.innerHTML = rows || '<span class="empty">未检测到平台</span>'
   list.querySelectorAll('[data-plat]').forEach(b => b.addEventListener('click', async () => {
     const r = await api('/import-platform', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ platform: b.dataset.plat }) })
     const n = (r || []).reduce((a, x) => a + x.imported, 0)
-    toast(`Imported ${n} from ${b.dataset.plat}`)
+    toast(`已从 ${b.dataset.plat} 导入 ${n} 条`)
   }))
 }
 async function loadSync() { await loadPlatforms() }
@@ -182,7 +183,7 @@ el('#tabBoard').addEventListener('click', () => setView('board'))
 el('#tabGraph').addEventListener('click', () => setView('graph'))
 el('#tabSync').addEventListener('click', () => setView('sync'))
 el('#tabAudit').addEventListener('click', () => setView('audit'))
-el('#refreshBtn').addEventListener('click', () => { refresh().then(() => toast('Refreshed')) })
+el('#refreshBtn').addEventListener('click', () => { refresh().then(() => toast('已刷新')) })
 el('#pinnedOnly').addEventListener('change', loadBoard)
 let searchTimer
 el('#search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadBoard, 200) })
@@ -192,7 +193,7 @@ el('#importBtn').addEventListener('click', async () => {
   const raw = el('#importPath').value.trim(); if (!raw) return
   const files = raw.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
   const res = await api('/import', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ files }) })
-  toast(`Imported ${(res || []).reduce((n, r) => n + r.imported, 0)} sections`); el('#importPath').value = ''
+  toast(`已导入 ${(res || []).reduce((n, r) => n + r.imported, 0)} 段`); el('#importPath').value = ''
 })
 window.addEventListener('resize', () => { if (view === 'graph') loadGraph() })
 

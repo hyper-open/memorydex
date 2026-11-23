@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>memorydex</title>
+<title>记忆看板 · memorydex</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%234fc08d'/%3E%3C/svg%3E" />
 <style>
   :root { --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --border:#2a2f3a; --text:#e6e8ee; --muted:#9aa3b2; --accent:#5b9dd9; --working:#8a7dff; --episodic:#e0a24a; --semantic:#4fc08d; --procedural:#d96d9c; --danger:#d96d6d; }
@@ -78,28 +78,28 @@
   <div class="stats" id="stats"></div>
   <div class="spacer"></div>
   <div class="tabs">
-    <button id="tabBoard" class="active">Board</button>
-    <button id="tabGraph">Graph</button>
-    <button id="tabSync">Sync</button>
-    <button id="tabAudit">Audit</button>
+    <button id="tabBoard" class="active">记忆看板</button>
+    <button id="tabGraph">关系图谱</button>
+    <button id="tabSync">平台导入</button>
+    <button id="tabAudit">写入审计</button>
   </div>
 </header>
 
 <!-- Board -->
 <div id="boardView">
   <div class="toolbar">
-    <input class="search" id="search" placeholder="Search memories (title / content / tags)…" />
-    <select id="platformFilter"><option value="">All platforms</option></select>
-    <select id="tagFilter"><option value="">All tags</option></select>
-    <label class="chk"><input type="checkbox" id="pinnedOnly" /> Pinned only</label>
-    <button class="ghost" id="refreshBtn">Refresh</button>
+    <input class="search" id="search" placeholder="搜索记忆（标题 / 内容 / 标签）…" />
+    <select id="platformFilter"><option value="">全部平台</option></select>
+    <select id="tagFilter"><option value="">全部标签</option></select>
+    <label class="chk"><input type="checkbox" id="pinnedOnly" /> 仅置顶</label>
+    <button class="ghost" id="refreshBtn">刷新</button>
   </div>
   <div class="layout" id="board"></div>
 </div>
 
 <!-- Graph -->
 <div id="graphView" class="hidden">
-  <div class="toolbar"><span style="color:var(--muted);font-size:12.5px">Memory graph — nodes are memories; lines are <code>links</code>. Drag to pan; scroll to zoom.</span></div>
+  <div class="toolbar"><span style="color:var(--muted);font-size:12.5px">记忆关系图 —— 节点为记忆，连线为关联（links）。</span></div>
   <div id="graphwrap"><svg class="graph" id="graph"></svg></div>
 </div>
 
@@ -107,20 +107,20 @@
 <div id="syncView" class="hidden">
   <div id="syncwrap">
     <div class="panel">
-      <h3>Platforms (Claude / Codex / Codebuddy / WorkBuddy)</h3>
-      <p style="color:var(--muted);font-size:12.5px;margin:0 0 8px">Auto-detected memory files on this machine. Import pulls them into this memory store (tagged by platform).</p>
-      <div class="filelist" id="platformlist"><span class="empty">Scanning…</span></div>
+      <h3>平台（Claude / Codex / Codebuddy / WorkBuddy）</h3>
+      <p style="color:var(--muted);font-size:12.5px;margin:0 0 8px">自动检测本机各平台的记忆文件，导入到本记忆库（按平台打标签）。</p>
+      <div class="filelist" id="platformlist"><span class="empty">扫描中…</span></div>
     </div>
     <div class="panel">
-      <h3>Import memory files</h3>
+      <h3>导入记忆文件</h3>
       <p style="color:var(--muted);font-size:12.5px;margin:0 0 8px">Parse AGENTS.md / CLAUDE.md / any Markdown into memory (one record per heading section).</p>
-      <div style="display:flex;gap:8px"><input id="importPath" placeholder="file path(s), comma separated" style="flex:1" /><button id="importBtn">Import</button></div>
+      <div style="display:flex;gap:8px"><input id="importPath" placeholder="文件路径（逗号分隔）" style="flex:1" /><button id="importBtn">导入</button></div>
     </div>
   </div>
 </div>
 
 <div id="auditView" class="hidden">
-  <div class="toolbar"><span style="color:var(--muted);font-size:12.5px">Recent write events (create/update/merge/delete), newest first.</span></div>
+  <div class="toolbar"><span style="color:var(--muted);font-size:12.5px">最近写入事件（创建 / 更新 / 合并 / 删除），新→旧。</span></div>
   <div id="auditwrap" style="padding:0 18px 40px;max-width:820px"><div id="auditlist"></div></div>
 </div>
 <div class="toast" id="toast"></div>
