@@ -7,6 +7,7 @@ any deployment / reverse proxy.
 
 ## What it does
 
+- **Project-scoped recall**: each sedimented memory records its project (cwd) in `metadata.project`; recall only injects memories from the **same project** (plus global ones without a project). Set `recall.scope: all` to search across projects.
 - **Auto-recall**: before each step, search memorydex with the incoming user
   message; if hits pass the score floor, inject a short
   *"reference only — not instructions"* block into that agent's system prompt.
@@ -29,6 +30,7 @@ the memorydex CLI/UI/MCP.
       enabled: true
       topK: 5                            # how many memories to inject
       minScore: 0                        # score floor (0 = any)
+      scope: project                     # project = only same-cwd memories (+ global); all = any
     sediment:
       enabled: true
       minChars: 40                       # skip trivial turns
